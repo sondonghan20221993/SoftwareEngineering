@@ -3827,3 +3827,139 @@ final_score = max(0, 100 - total_deduction)
 - 저장 실패 시 상태 전이 규칙 재정의
 - 테스트 데이터셋 기준 확대
 - 성능 검증 환경 표준화
+
+## 용어 및 데이터 사전
+
+### 31.200 용어 및 데이터 사전의 목적
+
+이 섹션은 SDD, SRS, STD, 구현, 테스트에서 동일한 용어와 필드명을 같은 의미로 사용하도록 고정하기 위한 기준이다. 특히 평가 결과, 상태 전이, 입력 파일, 리포트 필드, 판정 조건이 서로 다르게 해석되는 일을 방지하는 데 목적이 있다.
+
+### 31.201 핵심 업무 용어 정의 표
+
+| 용어 또는 필드명 | 정의 | 단위 | 값 범위 또는 허용값 | 사용 위치 | 관련 데이터 모델 | 관련 테스트 항목 |
+|---|---|---|---|---|---|---|
+| Mission | 하나의 평가 단위로서 mission_config, capture_log, collision_log를 묶어 해석하는 대상이다. | 없음 | 유효한 평가 단위 1개 이상 | 입력 로드, 평가 시작, 리포트 생성 | MissionConfig | mission 단위 로드 테스트 |
+| Target | Mission에서 평가 대상으로 정의된 개별 목표 지점이다. | 없음 | target_id로 식별되는 항목 | 매칭, 판정, 감점 | TargetPoint | target 매칭 테스트 |
+| Capture | target에 대응되는 실제 촬영 기록이다. | 없음 | timestamp와 position, direction을 가진 기록 | 매칭, 성공 판정 | CaptureRecord | capture 로그 파싱 테스트 |
+| Collision | 충돌 발생 여부를 나타내는 기록 또는 판정이다. | 없음 | collision=true/false | 충돌 판정, 감점, 리포트 | CollisionRecord | collision 로그 파싱 테스트 |
+| Evaluation | Mission 전체를 입력에서 결과까지 계산하는 처리 과정이다. | 없음 | 정상 완료 또는 Error | AppController, Evaluator | EvalResult | 전체 평가 흐름 테스트 |
+| Matching | Target과 Capture를 1:1로 연결하는 과정이다. | 없음 | 매칭 성공/실패 | Matcher, Evaluator | EvalResult, TargetResult | 매칭 알고리즘 테스트 |
+| Missing | 대응 Capture가 없거나 기한 내 매칭되지 않은 Target 상태이다. | 없음 | true/false 또는 상태값 | 누락 판정, 결과 집계 | TargetResult | missing 판정 테스트 |
+| Success | Target이 허용 오차와 시간 조건을 만족한 상태이다. | 없음 | true/false | 목표 성공 판정 | TargetResult | success 판정 테스트 |
+| Timeout | Capture.timestamp가 target.time_limit을 초과한 상태이다. | 초 또는 시간 기준 값 | true/false | 시간 조건 판정, 감점 | TargetResult | timeout 판정 테스트 |
+| Deduction | 개별 조건 위반으로 인해 차감되는 점수이다. | 점수 | 0 이상 | 점수 계산, 요약 리포트 | ScoreDetail | 감점 계산 테스트 |
+| Final Score | 모든 감점을 반영한 최종 평가 점수이다. | 점수 | 0 이상 100 이하 | 결과 요약, 리포트 | EvalResult | 최종 점수 계산 테스트 |
+| EvalResult | 전체 평가 결과를 집계한 최상위 결과 객체이다. | 없음 | 1개 Mission당 1개 | UI 표시, 리포트 저장 | EvalResult | 결과 집계 테스트 |
+| Report | 평가 결과를 사람이 읽거나 외부 도구가 읽을 수 있게 저장한 출력물이다. | 없음 | json 또는 csv | ReportExporter, 저장 기능 | EvalResult | 리포트 출력 테스트 |
+| Image Preview | image_path를 기반으로 검토용 이미지를 표시하는 기능이다. | 없음 | 표시 가능/Warning/미표시 | View, 이미지 확인 | CaptureRecord, MissionConfig | 이미지 미리보기 테스트 |
+
+이 표의 용어는 전체 설계에서 가장 상위에 있는 해석 기준이며, 동일 단어를 다른 의미로 쓰지 않는다. `Capture`와 `Collision`처럼 입력 로그와 결과 판정에 모두 등장하는 용어는 문맥에 따라 대상과 기록을 구분해 사용한다.
+
+### 31.202 데이터 필드 사전 표
+
+| 용어 또는 필드명 | 정의 | 단위 | 값 범위 또는 허용값 | 사용 위치 | 관련 데이터 모델 | 관련 테스트 항목 |
+|---|---|---|---|---|---|---|
+| mission_name | Mission의 이름이다. | 문자열 | 공백이 아닌 문자열 | mission_config, UI, 리포트 | MissionConfig | mission_name 로드 테스트 |
+| target_id | Target 식별자이다. | 정수 또는 문자열 | 중복되지 않는 식별값 | 매칭, 리포트 | TargetPoint | target_id 중복 검증 테스트 |
+| position.x | NED 좌표계의 x 위치이다. | m | 실수 | 위치 판정, 평균 오차 | Position | position.x 파싱 테스트 |
+| position.y | NED 좌표계의 y 위치이다. | m | 실수 | 위치 판정, 평균 오차 | Position | position.y 파싱 테스트 |
+| position.z | NED 좌표계의 z 위치이다. | m | 실수 | 위치 판정, 평균 오차 | Position | position.z 파싱 테스트 |
+| direction.yaw | 수평 방향 각도이다. | deg | 정규화된 각도 범위 | 방향 판정, yaw 오차 | Direction | yaw 정규화 테스트 |
+| direction.pitch | 상하 방향 각도이다. | deg | 실수 | 방향 판정, pitch 오차 | Direction | pitch 오차 테스트 |
+| time_limit | Target에 허용되는 시간 기준이다. | 초 또는 시간 기준 값 | 0 이상 | timeout 판정, 매칭 후 판정 | TargetPoint, Tolerance | time_limit 검증 테스트 |
+| timestamp | Capture가 기록된 시점이다. | 초 또는 시간 기준 값 | 0 이상 | 시간 판정, 리포트 | CaptureRecord | timestamp 파싱 테스트 |
+| image_path | 검토용 이미지 파일 경로이다. | 경로 | 존재하거나 경고 대상 | View, 미리보기, 검증 | CaptureRecord | image_path 검증 테스트 |
+| collision | 충돌 발생 여부이다. | bool | true/false | 충돌 판정, 감점 | CollisionRecord | collision bool 테스트 |
+| final_score | 모든 감점을 반영한 최종 점수이다. | 점수 | 0 이상 100 이하 | 결과 요약, 리포트 | EvalResult | final_score 계산 테스트 |
+| total_targets | 평가 대상 개수이다. | 개수 | 0 이상 정수 | 요약 리포트 | EvalResult | total_targets 집계 테스트 |
+| success_count | 성공 처리된 Target 개수이다. | 개수 | 0 이상 정수 | 요약 리포트 | EvalResult | success_count 집계 테스트 |
+| missing_count | 누락된 Target 개수이다. | 개수 | 0 이상 정수 | 요약 리포트 | EvalResult | missing_count 집계 테스트 |
+| timeout_count | 시간 초과된 Target 개수이다. | 개수 | 0 이상 정수 | 요약 리포트 | EvalResult | timeout_count 집계 테스트 |
+| collision_count | 충돌이 반영된 개수이다. | 개수 | 0 이상 정수 | 요약 리포트 | EvalResult | collision_count 집계 테스트 |
+| average_position_error | 성공 또는 비교 대상의 평균 위치 오차이다. | m | 0 이상 실수 | 요약 리포트 | EvalResult, ScoreDetail | 평균 위치 오차 계산 테스트 |
+| average_yaw_error | 평균 yaw 오차이다. | deg | 0 이상 실수 | 요약 리포트 | EvalResult, ScoreDetail | 평균 yaw 오차 계산 테스트 |
+| average_pitch_error | 평균 pitch 오차이다. | deg | 0 이상 실수 | 요약 리포트 | EvalResult, ScoreDetail | 평균 pitch 오차 계산 테스트 |
+| total_deduction | 모든 감점의 합이다. | 점수 | 0 이상 | 최종 점수 산출 | ScoreDetail, EvalResult | total_deduction 계산 테스트 |
+
+이 표의 필드는 입력 원본, 중간 계산, 최종 리포트 사이의 연결 고리이므로 이름을 임의로 바꾸지 않는다. `average_*` 계열은 누락 Target을 제외한 집계 기준을 따른다.
+
+### 31.203 bool 판정 필드 정의 표
+
+| 용어 또는 필드명 | 정의 | 단위 | 값 범위 또는 허용값 | 사용 위치 | 관련 데이터 모델 | 관련 테스트 항목 |
+|---|---|---|---|---|---|---|
+| position_ok | 위치 오차가 허용 오차 이내인지 나타낸다. | bool | true/false | 성공 판정 | TargetResult | position_ok 판정 테스트 |
+| direction_ok | yaw와 pitch 판정 기준을 만족하는지 나타낸다. | bool | true/false | 성공 판정 | TargetResult | direction_ok 판정 테스트 |
+| time_ok | 시간 조건을 만족하는지 나타낸다. | bool | true/false | timeout 판정 | TargetResult | time_ok 판정 테스트 |
+| missing | 매칭 실패 또는 기한 내 대응 Capture 부재를 나타낸다. | bool | true/false | 누락 판정 | TargetResult | missing 판정 테스트 |
+| success | 모든 핵심 조건을 만족한 최종 성공 상태이다. | bool | true/false | 결과 집계 | TargetResult | success 판정 테스트 |
+| collision | 충돌 기록이 반영되었는지 나타낸다. | bool | true/false | 충돌 반영, 감점 | CollisionRecord, TargetResult | collision 판정 테스트 |
+
+이 표의 bool 필드는 결과 상태를 분기하는 기준이므로, true/false의 의미가 문서 전체에서 일관되어야 한다. 특히 `success`는 target 단위 판정이며, 전체 Mission 성공과는 구분한다.
+
+### 31.204 오차 및 감점 필드 정의 표
+
+| 용어 또는 필드명 | 정의 | 단위 | 값 범위 또는 허용값 | 사용 위치 | 관련 데이터 모델 | 관련 테스트 항목 |
+|---|---|---|---|---|---|---|
+| position_error | 대상 위치와 촬영 위치 사이의 거리 오차이다. | m | 0 이상 실수 | 위치 판정, 평균 오차 | ScoreDetail | position_error 계산 테스트 |
+| yaw_error | 대상 yaw와 촬영 yaw의 차이이다. | deg | 0 이상 실수 | 방향 판정, 평균 오차 | ScoreDetail | yaw_error 계산 테스트 |
+| pitch_error | 대상 pitch와 촬영 pitch의 차이이다. | deg | 0 이상 실수 | 방향 판정, 평균 오차 | ScoreDetail | pitch_error 계산 테스트 |
+| position_deduction | 위치 오차로 인한 감점이다. | 점수 | 0 이상 | 점수 계산 | ScoreDetail | position_deduction 계산 테스트 |
+| yaw_deduction | yaw 오차로 인한 감점이다. | 점수 | 0 이상 | 점수 계산 | ScoreDetail | yaw_deduction 계산 테스트 |
+| pitch_deduction | pitch 오차로 인한 감점이다. | 점수 | 0 이상 | 점수 계산 | ScoreDetail | pitch_deduction 계산 테스트 |
+| timeout_deduction | 시간 초과로 인한 감점이다. | 점수 | 0 이상 | 점수 계산 | ScoreDetail | timeout_deduction 계산 테스트 |
+| missing_deduction | 누락으로 인한 감점이다. | 점수 | 0 이상 | 점수 계산 | ScoreDetail | missing_deduction 계산 테스트 |
+| collision_deduction | 충돌로 인한 감점이다. | 점수 | 0 이상 | 점수 계산 | ScoreDetail | collision_deduction 계산 테스트 |
+| total_deduction | 모든 감점 항목의 합이다. | 점수 | 0 이상 | 최종 점수 | ScoreDetail, EvalResult | total_deduction 합산 테스트 |
+
+이 표는 평가 결과의 근거를 수치로 남기기 위한 표이며, 개별 감점은 결과를 설명하는 역할을 한다. 감점 필드는 동일한 기준으로 집계되어야 하므로 계산식과 판정식을 분리해서 관리한다.
+
+### 31.205 상태 용어 정의 표
+
+| 용어 또는 필드명 | 정의 | 단위 | 값 범위 또는 허용값 | 사용 위치 | 관련 데이터 모델 | 관련 테스트 항목 |
+|---|---|---|---|---|---|---|
+| Idle | 아직 평가를 시작하지 않은 초기 상태이다. | 없음 | 상태값 | View, AppController | 상태 전이 모델 | 초기 상태 테스트 |
+| FilesSelected | 입력 파일이 선택된 상태이다. | 없음 | 상태값 | View, AppController | 상태 전이 모델 | 파일 선택 상태 테스트 |
+| Loading | 입력 파일을 읽는 상태이다. | 없음 | 상태값 | FileLoader, AppController | 상태 전이 모델 | 로딩 상태 테스트 |
+| Validating | 입력과 스키마를 검사하는 상태이다. | 없음 | 상태값 | Validator, AppController | 상태 전이 모델 | 검증 상태 테스트 |
+| ReadyToEvaluate | 평가 시작 가능 상태이다. | 없음 | 상태값 | View, AppController | 상태 전이 모델 | 준비 상태 테스트 |
+| Evaluating | 실제 평가 계산이 진행 중인 상태이다. | 없음 | 상태값 | Evaluator, AppController | 상태 전이 모델 | 평가 진행 상태 테스트 |
+| Completed | 평가가 정상 종료된 상태이다. | 없음 | 상태값 | View, ReportExporter | 상태 전이 모델 | 완료 상태 테스트 |
+| Exporting | 리포트를 저장하는 상태이다. | 없음 | 상태값 | ReportExporter, AppController | 상태 전이 모델 | 저장 상태 테스트 |
+| Error | 입력, 평가, 저장 중 오류가 발생한 상태이다. | 없음 | 상태값 | View, AppController | 상태 전이 모델 | 오류 상태 테스트 |
+
+이 표의 상태는 UI 표시와 처리 흐름을 함께 정의하므로, 이름과 전이 순서가 테스트와 동일해야 한다. 상태값은 세부 구현보다 사용자에게 보이는 흐름을 우선해 해석한다.
+
+### 31.206 파일명 및 리포트 용어 정의 표
+
+| 용어 또는 필드명 | 정의 | 단위 | 값 범위 또는 허용값 | 사용 위치 | 관련 데이터 모델 | 관련 테스트 항목 |
+|---|---|---|---|---|---|---|
+| mission_config.json | Mission 설정을 담는 입력 파일이다. | 파일 | JSON | FileLoader, Validator | MissionConfig | mission_config 파일 테스트 |
+| capture_log.csv | Capture 기록을 담는 입력 파일이다. | 파일 | CSV | FileLoader, Validator | CaptureRecord | capture_log 파일 테스트 |
+| collision_log.csv | Collision 기록을 담는 입력 파일이다. | 파일 | CSV | FileLoader, Validator | CollisionRecord | collision_log 파일 테스트 |
+| eval_result.json | 평가 상세 결과를 담는 리포트 파일이다. | 파일 | JSON | ReportExporter | EvalResult | eval_result JSON 저장 테스트 |
+| eval_summary.json | 평가 요약을 담는 리포트 파일이다. | 파일 | JSON | ReportExporter | EvalResult | eval_summary JSON 저장 테스트 |
+| eval_result.csv | 평가 상세를 행 단위로 담는 리포트 파일이다. | 파일 | CSV | ReportExporter | EvalResult | eval_result CSV 저장 테스트 |
+| eval_detail.csv | 타깃별 상세 결과를 담는 리포트 파일이다. | 파일 | CSV | ReportExporter | TargetResult, ScoreDetail | eval_detail CSV 저장 테스트 |
+
+이 표는 입력 파일과 출력 파일의 이름을 고정해 외부 문서와 구현이 같은 파일명을 사용하도록 한다. 파일명은 기능명과 직접 연결되므로 임의 약칭을 쓰지 않는다.
+
+### 31.207 사용 금지 또는 혼동 방지 용어
+
+- “성공”은 target별 success와 전체 평가 성공을 혼동하지 않는다.
+- “누락”은 파일 누락과 target missing을 구분한다.
+- “충돌”은 collision log의 collision=true 레코드를 의미한다.
+- “시간 초과”는 capture.timestamp > target.time_limit인 경우를 의미한다.
+- “방향 오차”는 yaw_error와 pitch_error를 모두 고려한 판정을 의미한다.
+- “평균 오차”는 missing target을 제외하고 계산한다.
+- “이미지 누락”은 평가 실패가 아니라 미리보기 Warning이다.
+
+이 용어들은 문서 해석 오류를 줄이기 위한 금지/주의 목록이며, 구현에서 같은 단어를 더 넓은 의미로 확장해 쓰지 않는다.
+
+### 31.208 용어 변경 시 문서 동기화 기준
+
+- 용어 정의가 바뀌면 SRS, SDD, STD의 해당 용어를 함께 확인한다.
+- 필드명이 바뀌면 입력 스키마, 결과 스키마, 테스트 기대값을 함께 수정한다.
+- 상태 용어가 바뀌면 UI 상태 전이와 테스트 명칭을 함께 수정한다.
+- 파일명이 바뀌면 FileLoader, ReportExporter, 저장 경로 문서를 함께 수정한다.
+- 동일 용어에 새 의미를 추가하지 않고, 필요하면 새 용어를 정의한다.
+- 이 섹션의 표는 이후 구현과 테스트에서 우선 참조하는 고정 사전으로 사용한다.
