@@ -1817,3 +1817,85 @@ sequenceDiagram
 - `FileLoader`, `Validator`, `Evaluator`, `Matcher`, `ScoreCalculator`, `ReportExporter`는 각각의 처리 책임만 수행하고 UI를 직접 호출하지 않는다.
 - `View`는 사용자 입력을 Controller로 전달하고 결과만 표시하며, Service 계층의 내부 구현을 알 필요가 없다.
 - 리포트 저장은 평가 완료 이후 사용자가 별도로 요청할 때 실행되는 후속 흐름으로 분리한다.
+
+## 평가 상태 전이도
+
+### 31.17 상태 전이도 목적
+
+이 상태 전이도는 파일 선택부터 로드, 검증, 평가, 완료, 저장, 오류 복구까지의 화면 상태 변화를 정의하기 위한 것이다. 사용자가 어떤 시점에 어떤 행동을 할 수 있는지, 그리고 Controller가 어떤 상태값을 기준으로 UI를 제어해야 하는지를 명확히 한다.
+
+### 31.18 Mermaid stateDiagram-v2
+
+```mermaid
+stateDiagram-v2
+  [*] --> Idle
+  Idle --> FilesSelected: 파일 선택 완료
+  FilesSelected --> Loading: 평가 실행
+  Loading --> Validating: 파일 로드 성공
+  Loading --> Error: 파일 로드 실패
+  Validating --> ReadyToEvaluate: 검증 성공
+  Validating --> Error: 검증 실패
+  ReadyToEvaluate --> Evaluating: 평가 시작
+  Evaluating --> Completed: 평가 성공
+  Evaluating --> Error: 평가 실패
+  Completed --> Exporting: 리포트 저장 요청
+  Exporting --> Completed: 저장 성공
+  Exporting --> Error: 저장 실패
+  Error --> Idle: 오류 확인 또는 초기화
+```
+
+### 31.19 상태 목록 설명
+
+| 상태 | 설명 | 허용 사용자 동작 |
+|---|---|---|
+| Idle | 초기 상태로, 파일 선택 전 또는 오류 복구 후 초기화된 상태이다. | 파일 선택, 초기화 |
+| FilesSelected | 필수 입력 파일이 선택되었지만 아직 로드와 검증이 시작되지 않은 상태이다. | 파일 재선택, 평가 실행 |
+| Loading | FileLoader가 입력 파일을 읽는 중인 상태이다. | 진행 상태 확인 |
+| Validating | Validator가 입력 데이터를 검사하는 중인 상태이다. | 진행 상태 확인 |
+| ReadyToEvaluate | 검증이 끝나 평가를 시작할 수 있는 상태이다. | 평가 시작 |
+| Evaluating | Matcher와 ScoreCalculator를 포함한 평가가 실행 중인 상태이다. | 진행 상태 확인 |
+| Completed | 평가가 끝나 결과가 생성된 상태이다. | 결과 조회, 리포트 저장 |
+| Exporting | ReportExporter가 결과 파일을 저장하는 중인 상태이다. | 저장 진행 상태 확인 |
+| Error | 복구 가능한 오류가 발생해 사용자 조치가 필요한 상태이다. | 오류 확인, 초기화, 파일 재선택 |
+
+### 31.20 상태 전이 조건
+
+| 현재 상태 | 이벤트 | 다음 상태 | 조건 |
+|---|---|---|---|
+| Idle | 파일 선택 완료 | FilesSelected | 필수 파일 경로가 모두 지정됨 |
+| FilesSelected | 평가 실행 | Loading | 사용자가 평가 실행을 요청함 |
+| Loading | 파일 로드 성공 | Validating | 모든 필수 입력이 정상적으로 로드됨 |
+| Loading | 파일 로드 실패 | Error | JSON/CSV 파싱 실패, 파일 접근 실패 등 |
+| Validating | 검증 성공 | ReadyToEvaluate | 구조와 값 검증을 모두 통과함 |
+| Validating | 검증 실패 | Error | 필수 필드 누락, 값 범위 오류, 전체 입력 무효 등 |
+| ReadyToEvaluate | 평가 시작 | Evaluating | Controller가 평가 실행을 개시함 |
+| Evaluating | 평가 성공 | Completed | EvalResult 생성 완료 |
+| Evaluating | 평가 실패 | Error | 매칭 불가, 평가 중 예외, 유효 비행 로그 없음 등 |
+| Completed | 리포트 저장 요청 | Exporting | 사용자가 저장을 요청함 |
+| Exporting | 저장 성공 | Completed | 결과 파일 저장 완료 |
+| Exporting | 저장 실패 | Error | 쓰기 실패, 경로 오류, 권한 문제 등 |
+| Error | 오류 확인 또는 초기화 | Idle | 오류를 확인하고 다시 시작함 |
+
+### 31.21 오류 상태 처리
+
+- Error 상태는 프로그램 종료 상태가 아니라 복구 가능한 오류 표시 상태이다.
+- 파일 로드 실패, 검증 실패, 평가 실패, 저장 실패가 발생하면 Controller는 원인에 맞는 오류 메시지를 UI에 전달하고 Error 상태로 전환한다.
+- 사용자가 오류를 확인하거나 초기화를 수행하면 Idle 상태로 돌아가며, 필요한 파일만 다시 선택해도 흐름을 재개할 수 있다.
+- 평가 중 발생한 오류는 결과가 완전히 생성되지 못했음을 의미하므로, Completed와 구분해서 처리해야 한다.
+
+### 31.22 UI 버튼 활성/비활성 기준
+
+- Idle 상태에서는 파일 선택 버튼은 활성화되고, 평가 실행 버튼과 리포트 저장 버튼은 비활성화된다.
+- FilesSelected 상태에서는 평가 실행 버튼이 활성화되지만, 평가가 시작되면 파일 선택 버튼은 비활성화되어야 한다.
+- Loading, Validating, Evaluating, Exporting 상태에서는 평가 흐름이 진행 중이므로 파일 선택과 리포트 저장 관련 버튼을 제한해야 한다.
+- ReadyToEvaluate 상태에서는 평가 실행 버튼이 활성화되고, 리포트 저장 버튼은 아직 비활성화된다.
+- Completed 상태에서는 결과 조회와 리포트 저장이 가능하므로, 결과 저장 버튼을 활성화할 수 있다.
+- Error 상태에서는 오류 확인과 파일 재선택은 허용하되, 평가 실행과 리포트 저장은 차단해야 한다.
+
+### 31.23 Controller가 관리해야 하는 상태값
+
+- Controller는 현재 워크플로 상태를 단일 상태값으로 관리해 UI 버튼 활성화와 메시지 표시를 제어해야 한다.
+- 최소한 `Idle`, `FilesSelected`, `Loading`, `Validating`, `ReadyToEvaluate`, `Evaluating`, `Completed`, `Exporting`, `Error`를 구분해야 한다.
+- Controller는 파일 로드 완료 여부, 검증 통과 여부, 평가 결과 생성 여부, 저장 진행 여부를 상태값에 반영해야 한다.
+- Controller는 평가 중에 파일 선택과 리포트 저장 요청이 동시에 들어오지 않도록 상태 기반으로 입력을 차단해야 한다.
+- Service 계층은 상태값을 직접 보관하거나 UI 상태를 변경하지 않고, 처리 결과만 Controller에 반환해야 한다.
