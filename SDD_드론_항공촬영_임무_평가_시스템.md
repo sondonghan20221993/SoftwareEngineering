@@ -1716,3 +1716,104 @@ flowchart LR
 - `Evaluator`는 전체 흐름을 조율하되, 매칭과 점수 계산의 세부 규칙은 `Matcher`와 `ScoreCalculator`로 분리한다.
 - `UI Result View`는 결과를 표시만 하고, 평가 알고리즘이나 저장 형식에 의존하지 않는다.
 - `ReportExporter`는 출력 파일 생성을 전담하고, 화면 갱신과는 분리된다.
+
+## 평가 실행 Sequence Diagram
+
+### 31.9 Sequence Diagram의 목적
+
+이 시퀀스 다이어그램은 사용자가 평가를 시작한 뒤, 파일 로드와 검증, 평가 실행, 결과 표시, 리포트 저장이 어떤 순서로 호출되는지 보여주기 위한 것이다. 특히 Controller는 흐름을 조율만 하고, 파일 파싱이나 매칭, 점수 계산은 각각의 Service가 담당해야 한다는 책임 분리를 명확히 한다.
+
+### 31.10 Mermaid sequenceDiagram
+
+```mermaid
+sequenceDiagram
+  actor User
+  participant View
+  participant AppController
+  participant FileLoader
+  participant Validator
+  participant Evaluator
+  participant Matcher
+  participant ScoreCalculator
+  participant ReportExporter
+
+  User->>View: 평가 실행 버튼 클릭
+  View->>AppController: run_evaluation(file_paths)
+  AppController->>FileLoader: load_all(file_paths)
+  FileLoader-->>AppController: loaded_data
+  AppController->>Validator: validate_all(loaded_data)
+  Validator-->>AppController: validation_result
+
+  alt 검증 실패
+    AppController->>View: show_errors(validation_errors)
+  else 검증 성공
+    AppController->>Evaluator: evaluate(valid_data)
+    Evaluator->>Matcher: match_targets_to_captures()
+    Matcher-->>Evaluator: matched_pairs
+    Evaluator->>ScoreCalculator: calculate_score()
+    ScoreCalculator-->>Evaluator: score_detail
+    Evaluator-->>AppController: eval_result
+    AppController->>View: show_result(eval_result)
+  end
+
+  User->>View: 리포트 저장 버튼 클릭
+  View->>AppController: export_report(save_path)
+  AppController->>ReportExporter: export(eval_result, save_path)
+  ReportExporter-->>AppController: export_result
+  AppController->>View: show_export_status(export_result)
+```
+
+### 31.11 참여 객체 설명
+
+| 객체 | 입력 | 출력 | 역할 |
+|---|---|---|---|
+| User | UI 조작 | 버튼 클릭 이벤트 | 평가 실행과 리포트 저장을 요청한다. |
+| View | 사용자 이벤트, `EvalResult`, 오류 정보 | Controller 호출, 화면 표시 | 사용자의 요청을 전달하고 결과를 표시한다. |
+| AppController | 파일 경로, 검증 결과, 평가 결과 | Service 호출, UI 갱신 요청 | 전체 흐름을 조율하고 상태 전이를 관리한다. |
+| FileLoader | 파일 경로 | `loaded_data` | 입력 파일을 읽어 모델 데이터로 변환한다. |
+| Validator | `loaded_data` | `validation_result` | 입력 데이터의 구조와 값 유효성을 검사한다. |
+| Evaluator | `valid_data` | `eval_result` | 검증 통과 데이터를 기반으로 평가를 수행한다. |
+| Matcher | 목표와 촬영 데이터 | `matched_pairs` | 목표와 촬영 기록의 매칭 결과를 계산한다. |
+| ScoreCalculator | 매칭 결과와 정책 값 | `score_detail` | 감점과 최종 점수 계산에 필요한 상세 결과를 만든다. |
+| ReportExporter | `eval_result`, 저장 경로 | `export_result` | 평가 결과를 파일로 저장한다. |
+
+### 31.12 정상 평가 흐름
+
+1. 사용자가 View에서 평가 실행 버튼을 누른다.
+2. View는 `AppController.run_evaluation(file_paths)`를 호출한다.
+3. `AppController`는 `FileLoader.load_all(file_paths)`를 호출해 입력 데이터를 읽는다.
+4. `FileLoader`는 원본 파일을 파싱해 `loaded_data`를 반환한다.
+5. `AppController`는 `Validator.validate_all(loaded_data)`를 호출해 검증을 수행한다.
+6. 검증이 성공하면 `AppController`는 `Evaluator.evaluate(valid_data)`를 호출한다.
+7. `Evaluator`는 `Matcher.match_targets_to_captures()`와 `ScoreCalculator.calculate_score()`를 순서대로 사용해 `eval_result`를 만든다.
+8. `AppController`는 `View.show_result(eval_result)`를 호출해 화면에 결과를 표시한다.
+
+### 31.13 검증 실패 흐름
+
+- `Validator`가 구조 오류, 필수 필드 누락, 값 범위 위반, 파싱 가능하지만 레코드 제외가 필요한 오류를 구분해 반환한다.
+- 전체 입력이 무효한 경우에는 검증 실패로 처리하고 `AppController`는 `View.show_errors(validation_errors)`를 호출한다.
+- 개별 레코드 단위의 결함처럼 평가 계속이 가능한 경우에는 해당 레코드만 제외하고, 나머지 유효 데이터로 평가를 진행할 수 있다.
+- 이때 UI는 경고성 오류 목록을 보여주되, 평가 중단 여부는 `validation_result`의 실패 범위에 따라 결정한다.
+
+### 31.14 평가 실패 흐름
+
+- 검증을 통과했더라도 `Evaluator` 내부에서 유효 비행 기준 미충족, 매칭 불가, 점수 계산 불가능 상태가 발생하면 평가 실패로 처리한다.
+- 평가 실패는 입력 검증 실패와 다르며, 전자는 평가 로직 실행 중 발생한 실패이고 후자는 입력 데이터 자체의 유효성 실패이다.
+- 평가 실패 시 `AppController`는 가능한 범위의 오류 정보를 `View`에 전달하고, 성공한 경우와 동일하게 이전 결과 화면을 유지하거나 오류 상태를 표시해야 한다.
+
+### 31.15 리포트 저장 흐름
+
+1. 평가는 이미 완료되어 `eval_result`가 존재해야 한다.
+2. 사용자가 View에서 리포트 저장 버튼을 누른다.
+3. View는 `AppController.export_report(save_path)`를 호출한다.
+4. `AppController`는 `ReportExporter.export(eval_result, save_path)`를 호출한다.
+5. `ReportExporter`는 결과를 저장하고 `export_result`를 반환한다.
+6. `AppController`는 `View.show_export_status(export_result)`를 호출해 저장 성공 또는 실패를 알린다.
+
+### 31.16 Controller와 Service의 책임 분리
+
+- `AppController`는 입력 경로 전달, 실행 순서 제어, 오류와 결과의 UI 전달만 담당한다.
+- `AppController`는 파일 파싱, 목표-촬영 매칭, 점수 계산을 직접 수행하지 않는다.
+- `FileLoader`, `Validator`, `Evaluator`, `Matcher`, `ScoreCalculator`, `ReportExporter`는 각각의 처리 책임만 수행하고 UI를 직접 호출하지 않는다.
+- `View`는 사용자 입력을 Controller로 전달하고 결과만 표시하며, Service 계층의 내부 구현을 알 필요가 없다.
+- 리포트 저장은 평가 완료 이후 사용자가 별도로 요청할 때 실행되는 후속 흐름으로 분리한다.
