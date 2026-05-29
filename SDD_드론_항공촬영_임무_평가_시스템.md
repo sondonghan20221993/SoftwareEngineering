@@ -2160,3 +2160,109 @@ classDiagram
 - `TargetResult` 또는 `ScoreDetail`이 바뀌면 결과 요약, 상세 결과, 리포트 저장 형식이 함께 수정되어야 한다.
 - `EvalResult`가 바뀌면 화면 표시, 저장 파일, 테스트 기준이 함께 갱신되어야 한다.
 - 모델 변경은 상위 서비스와 UI의 직접적인 데이터 계약 변경이므로, 관련 계층을 함께 검토해야 한다.
+
+## 입력 파일 스키마 상세 설계
+
+### 31.40 입력 파일 스키마 상세 설계의 목적
+
+이 섹션은 임무 설정 파일과 로그 파일의 필드, 타입, 단위, 오류 처리 기준을 문서 수준에서 고정하기 위한 것이다. 파일 로더와 검증기가 동일한 해석 기준을 사용하도록 하여, 입력 형식 차이로 인한 해석 오류를 줄인다.
+
+### 31.41 mission_config.json 스키마 표
+
+| 필드명 | 타입 | 필수 여부 | 단위 | 허용 범위 | 기본값 | 오류 처리 | 관련 데이터 모델 |
+|---|---|---|---|---|---|---|---|
+| mission_name | str | 필수 | - | 빈 문자열 비권장 | 없음 | 누락 또는 비문자열이면 스키마 오류 | MissionConfig |
+| targets | list[object] | 필수 | - | 1개 이상 | 없음 | 누락, 비어 있음, 배열 외 타입이면 스키마 오류 | MissionConfig |
+| targets[].target_id | str | 필수 | - | 임무 내 중복 불가 | 없음 | 중복 또는 누락이면 검증 오류 | TargetPoint |
+| targets[].position.x | float | 필수 | meter | NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 비정상 값이면 검증 오류 | Position |
+| targets[].position.y | float | 필수 | meter | NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 비정상 값이면 검증 오류 | Position |
+| targets[].position.z | float | 필수 | meter | NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 비정상 값이면 검증 오류 | Position |
+| targets[].direction.yaw | float | 필수 | degree | NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 비정상 값이면 검증 오류 | Direction |
+| targets[].direction.pitch | float | 필수 | degree | NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 비정상 값이면 검증 오류 | Direction |
+| targets[].time_limit | float | 필수 | second | 0 이상, NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 음수면 검증 오류 | TargetPoint |
+| tolerance.position | float | 필수 | meter | 0 이상, NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 음수면 검증 오류 | Tolerance |
+| tolerance.yaw | float | 필수 | degree | 0 이상, NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 음수면 검증 오류 | Tolerance |
+| tolerance.pitch | float | 필수 | degree | 0 이상, NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 음수면 검증 오류 | Tolerance |
+| weights.position | float | 필수 | - | 0 초과, NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 0 이하이면 검증 오류 | Weights |
+| weights.direction | float | 필수 | - | 0 초과, NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 0 이하이면 검증 오류 | Weights |
+| deduction_policy.position | float | 필수 | meter당 감점 | 0 이상, NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 음수면 검증 오류 | DeductionPolicy |
+| deduction_policy.yaw | float | 필수 | degree당 감점 | 0 이상, NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 음수면 검증 오류 | DeductionPolicy |
+| deduction_policy.pitch | float | 필수 | degree당 감점 | 0 이상, NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 음수면 검증 오류 | DeductionPolicy |
+| deduction_policy.timeout | float | 필수 | 점수 | 0 이상, NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 음수면 검증 오류 | DeductionPolicy |
+| deduction_policy.missing | float | 필수 | 점수 | 0 이상, NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 음수면 검증 오류 | DeductionPolicy |
+| deduction_policy.collision | float | 필수 | 점수 | 0 이상, NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 음수면 검증 오류 | DeductionPolicy |
+
+### 31.42 capture_log.csv 스키마 표
+
+| 필드명 | 타입 | 필수 여부 | 단위 | 허용 범위 | 기본값 | 오류 처리 | 관련 데이터 모델 |
+|---|---|---|---|---|---|---|---|
+| timestamp | float | 필수 | second | 0 이상, NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 음수면 검증 오류 | CaptureRecord |
+| x | float | 필수 | meter | NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 비정상 값이면 검증 오류 | Position |
+| y | float | 필수 | meter | NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 비정상 값이면 검증 오류 | Position |
+| z | float | 필수 | meter | NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 비정상 값이면 검증 오류 | Position |
+| yaw | float | 필수 | degree | NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 비정상 값이면 검증 오류 | Direction |
+| pitch | float | 필수 | degree | NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 비정상 값이면 검증 오류 | Direction |
+| image_path | str | 필수 | - | 문자열이어야 함 | 없음 | 문자열이 아니면 스키마 오류, 존재 여부는 Validator 검증 | CaptureRecord |
+
+### 31.43 collision_log.csv 스키마 표
+
+| 필드명 | 타입 | 필수 여부 | 단위 | 허용 범위 | 기본값 | 오류 처리 | 관련 데이터 모델 |
+|---|---|---|---|---|---|---|---|
+| timestamp | float | 필수 | second | 0 이상, NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 음수면 검증 오류 | CollisionRecord |
+| collision | bool | 필수 | - | true, false, 1, 0, yes, no | 없음 | 허용 문자열/숫자 외 값이면 스키마 오류 | CollisionRecord |
+| x | float | 필수 | meter | NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 비정상 값이면 검증 오류 | Position |
+| y | float | 필수 | meter | NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 비정상 값이면 검증 오류 | Position |
+| z | float | 필수 | meter | NaN/Infinity 제외 | 없음 | 수치 변환 실패 또는 비정상 값이면 검증 오류 | Position |
+
+### 31.44 공통 파일 처리 규칙
+
+- 모든 입력 파일은 UTF-8로 해석한다.
+- CSV와 JSON은 파일 전체를 먼저 식별한 뒤 형식에 맞게 파싱한다.
+- 숫자 필드는 NaN과 Infinity를 허용하지 않는다.
+- timestamp는 0 이상이어야 한다.
+- target_id는 임무 내에서 중복되면 안 된다.
+- targets는 최소 1개 이상이어야 한다.
+- image_path는 문자열이어야 하며 파일 존재 여부는 Validator에서 확인한다.
+- collision 값은 대소문자를 구분하지 않고 허용된 문자열이나 숫자만 받아들인다.
+
+### 31.45 CSV 헤더 처리 규칙
+
+- CSV 헤더는 필수이며, 헤더가 없으면 스키마 오류로 처리한다.
+- CSV 필드 순서는 고정 위치가 아니라 헤더 이름을 기준으로 해석한다.
+- 헤더 이름이 기대 목록과 다르면 로드 단계에서 오류를 반환한다.
+- 추가 컬럼이 존재하더라도 필수 컬럼이 모두 있으면 허용할 수 있지만, 필수 컬럼 누락은 허용하지 않는다.
+
+### 31.46 JSON 최상위 구조 처리 규칙
+
+- mission_config.json은 단일 JSON 객체여야 한다.
+- 최상위 객체는 mission_name, targets, tolerance, weights, deduction_policy를 포함해야 한다.
+- targets는 배열이어야 하며 각 원소는 TargetPoint 구조를 따라야 한다.
+- 임의의 중첩 구조나 배열 최상위 형식은 허용하지 않는다.
+
+### 31.47 숫자 필드 처리 규칙
+
+- 모든 숫자 필드는 float로 파싱 가능해야 한다.
+- NaN, Infinity, -Infinity는 허용하지 않는다.
+- 음수 허용 여부는 필드 의미에 따라 다르며, time_limit과 timestamp는 0 이상이어야 한다.
+- 허용 범위를 벗어난 값은 로드 실패와 구분하여 검증 오류로 보고할 수 있다.
+
+### 31.48 경로 필드 처리 규칙
+
+- image_path는 문자열이어야 한다.
+- 상대 경로일 수 있으며, 존재 여부는 Validator가 이미지 폴더 기준으로 확인한다.
+- 절대 경로일 경우에는 그대로 해석하며, 실제 파일 존재 여부를 별도로 확인한다.
+- 경로 문자열 자체가 비어 있거나 문자열이 아니면 스키마 오류로 처리한다.
+
+### 31.49 스키마 오류와 검증 오류의 구분
+
+- 스키마 오류는 파일 구조, 필드명, 타입, 헤더, 최상위 형태가 문서와 맞지 않을 때 발생한다.
+- 검증 오류는 구조는 맞지만 값 범위, 중복, 존재 여부, NaN, 파일 존재 여부 같은 세부 규칙 위반일 때 발생한다.
+- 스키마 오류는 파일 로드 단계에서 입력 형식 자체가 맞지 않음을 의미한다.
+- 검증 오류는 입력을 일부 또는 전부 사용 가능한지 판단하는 단계에서 발생한다.
+
+### 31.50 향후 flight_log.csv 확장 가능성
+
+- flight_log.csv는 이번 구현 범위에 포함하지 않는다.
+- 향후 확장 시에는 timestamp, x, y, z, roll, pitch, yaw, speed와 같은 비행 기록 필드를 별도 스키마로 정의할 수 있다.
+- 이 확장은 현재 MissionConfig, CaptureRecord, CollisionRecord, TargetResult, EvalResult 구조와 충돌하지 않도록 독립적으로 추가해야 한다.
+- 현재 단계에서는 flight_log.csv를 전제하지 않으며, 로드와 검증 규칙도 여기에 맞추지 않는다.
