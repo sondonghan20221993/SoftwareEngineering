@@ -2783,3 +2783,160 @@ final_score = max(0, 100 - total_deduction)
 - `tests/test_report_exporter.py`는 기본 파일명과 덮어쓰기 정책을 검증한다.
 - `tests/test_report_exporter.py`는 저장 실패 시 결과 유지와 오류 전달을 검증한다.
 - `tests/test_evaluator.py`와 `tests/test_score_calculator.py`는 저장 대상이 되는 `EvalResult`와 `ScoreDetail` 값이 올바르게 생성되는지 검증한다.
+
+## UI 탭별 상세 설계
+
+### 31.106 UI 탭별 상세 설계의 목적
+
+이 섹션은 PyQt5 기반 UI를 7개 탭으로 분리해 각 화면의 목적, 입력과 출력, Controller 호출, 상태 전이, 오류 표시 방식을 명확히 하기 위한 것이다. View는 Service를 직접 호출하지 않고 AppController만 호출하며, AppController는 UI 위젯 내부 구현에 의존하지 않고 필요한 데이터만 전달한다.
+
+### 31.107 전체 UI 구성 원칙
+
+- UI는 PyQt5 기반으로 구현한다.
+- 최상위 창은 `QMainWindow`를 사용한다.
+- 탭 구조는 `QTabWidget`으로 구성한다.
+- UI는 파일 선택, 검증, 평가, 결과 조회, 저장 흐름을 하나의 화면 계층 안에서 분리해서 보여준다.
+- 평가 중에는 파일 선택, 평가 재실행, 리포트 저장 버튼을 제한한다.
+- 평가 완료 전에는 결과 관련 탭이 안내 중심 또는 비활성 상태를 유지해야 한다.
+
+### 31.108 QMainWindow와 QTabWidget 구성 설명
+
+| 구성 요소 | 역할 | UI 책임 |
+|---|---|---|
+| QMainWindow | 전체 애플리케이션 창 제공 | 메뉴, 상태, 탭 영역을 포함한다. |
+| QTabWidget | 7개 기능 탭 관리 | 탭 간 전환과 상태별 활성화를 관리한다. |
+| Status/Message Area | 상태 메시지 표시 | 검증 오류, 평가 진행, 저장 결과를 요약 표시한다. |
+
+### 31.109 파일 선택 탭 설계
+
+| 항목 | 내용 |
+|---|---|
+| 목적 | mission_config.json, capture_log.csv, collision_log.csv, image folder를 선택하고 파일 경로를 확인한다. |
+| 입력 요소 | mission_config.json 선택, capture_log.csv 선택, collision_log.csv 선택, image folder 선택, 선택된 경로 표시, 파일 경로 초기화 버튼 |
+| 출력 요소 | 선택된 경로 목록, 선택 상태, 오류 메시지 |
+| 주요 버튼 | 파일 선택 버튼, 경로 초기화 버튼 |
+| 호출하는 Controller 메서드 | `set_file_paths(file_paths)`, 필요 시 `reset_state()` |
+| 상태 전이 영향 | 필수 파일이 모두 선택되면 `FilesSelected` 상태로 전이할 수 있다. |
+| 오류 표시 방식 | 누락 경로, 잘못된 형식, 선택 실패를 경로별 메시지로 표시한다. |
+| 비활성화 조건 | 평가 중에는 파일 선택과 초기화 버튼을 비활성화한다. |
+
+### 31.110 임무 설정 확인 탭 설계
+
+| 항목 | 내용 |
+|---|---|
+| 목적 | mission_name, target 목록, tolerance, weights, deduction_policy를 확인한다. |
+| 입력 요소 | 로드된 mission_name 표시, target 목록 표시, tolerance 표시, weights 표시, deduction_policy 표시 |
+| 출력 요소 | 읽기 전용 임무 설정 요약 |
+| 주요 버튼 | 별도 실행 버튼 없음, 필요 시 갱신 버튼 또는 재로드 동작 |
+| 호출하는 Controller 메서드 | `load_inputs()`, `validate_inputs()` |
+| 상태 전이 영향 | 로드 전에는 빈 상태 또는 비활성 상태를 유지한다. |
+| 오류 표시 방식 | 로드 실패 시 요약 영역을 비우고 오류 메시지를 표시한다. |
+| 비활성화 조건 | 파일 로드 전, 또는 검증 실패 시 편집 가능한 요소를 비활성화한다. |
+
+### 31.111 평가 실행 탭 설계
+
+| 항목 | 내용 |
+|---|---|
+| 목적 | 평가 실행, 진행 상태 확인, 검증 오류 요약 확인을 수행한다. |
+| 입력 요소 | 평가 실행 버튼, 진행 상태 표시, 검증 오류 요약 표시 |
+| 출력 요소 | 평가 상태, 진행률, 오류 요약, 실행 결과 안내 |
+| 주요 버튼 | 평가 실행 버튼 |
+| 호출하는 Controller 메서드 | `run_evaluation()` |
+| 상태 전이 영향 | 실행 성공 시 `Completed` 상태로 전이한다. |
+| 오류 표시 방식 | 검증 오류 요약, 평가 실패 메시지, 중복 실행 차단 메시지를 표시한다. |
+| 비활성화 조건 | 평가 중에는 실행 버튼을 비활성화하고, 저장 전까지 재실행을 제한한다. |
+
+### 31.112 결과 요약 탭 설계
+
+| 항목 | 내용 |
+|---|---|
+| 목적 | 전체 평가의 핵심 집계와 최종 점수를 확인한다. |
+| 입력 요소 | 없음, 결과 표시 중심 |
+| 출력 요소 | `final_score`, `total_targets`, `success_count`, `missing_count`, `timeout_count`, `collision_count`, `average_position_error`, `average_yaw_error`, `average_pitch_error` |
+| 주요 버튼 | 별도 주요 버튼 없음 |
+| 호출하는 Controller 메서드 | `show_result_summary(eval_result)` |
+| 상태 전이 영향 | `Completed` 상태에서 활성화된다. |
+| 오류 표시 방식 | 결과가 없으면 안내 문구를 표시한다. |
+| 비활성화 조건 | 평가 완료 전에는 비어 있거나 안내 중심으로 유지한다. |
+
+### 31.113 상세 결과 탭 설계
+
+| 항목 | 내용 |
+|---|---|
+| 목적 | target별 상세 판정과 감점을 확인하고 이미지 미리보기를 제공한다. |
+| 입력 요소 | target_results 테이블, target 선택, 이미지 미리보기 영역 |
+| 출력 요소 | target_id, matched_capture_timestamp, position_error, yaw_error, pitch_error, position_ok, direction_ok, time_ok, missing, success, deduction |
+| 주요 버튼 | 선택 항목 갱신, 이미지 미리보기 갱신 |
+| 호출하는 Controller 메서드 | `show_target_details(target_results)` |
+| 상태 전이 영향 | `Completed` 상태에서 사용 가능하다. |
+| 오류 표시 방식 | 이미지가 없거나 열 수 없으면 대체 텍스트를 표시한다. |
+| 비활성화 조건 | 평가 전에는 테이블과 미리보기를 비활성화한다. |
+
+### 31.114 시각화 탭 설계
+
+| 항목 | 내용 |
+|---|---|
+| 목적 | 위치 오차, yaw 오차, pitch 오차, target별 deduction, 성공/실패 비율을 시각화한다. |
+| 입력 요소 | 그래프 캔버스, 결과 데이터, 안내 문구 |
+| 출력 요소 | 위치 오차 그래프, yaw 오차 그래프, pitch 오차 그래프, target별 deduction 그래프, 성공/실패 비율 |
+| 주요 버튼 | 선택적 새로고침 또는 저장 버튼이 있을 수 있으나 설계상 필수는 아니다. |
+| 호출하는 Controller 메서드 | `show_result_summary(eval_result)`, `show_target_details(target_results)` 기반 갱신 |
+| 상태 전이 영향 | 평가 완료 후 활성화된다. |
+| 오류 표시 방식 | 평가 전에는 안내 문구를 표시하고 그래프 영역은 비워 둔다. |
+| 비활성화 조건 | `Completed` 이전에는 그래프 갱신을 제한한다. |
+
+### 31.115 리포트 저장 탭 설계
+
+| 항목 | 내용 |
+|---|---|
+| 목적 | 저장 폴더를 선택하고 JSON/CSV 리포트를 저장한다. |
+| 입력 요소 | 저장 폴더 선택, `eval_result.json` 저장, `eval_summary.json` 저장, `eval_result.csv` 저장, `eval_detail.csv` 저장 |
+| 출력 요소 | 저장 성공/실패 메시지, 저장 파일 목록 |
+| 주요 버튼 | 저장 폴더 선택 버튼, 리포트 저장 버튼 |
+| 호출하는 Controller 메서드 | `export_report(save_dir)` |
+| 상태 전이 영향 | 평가 완료 후에만 저장이 가능하다. |
+| 오류 표시 방식 | 저장 경로 없음, 권한 없음, 일부 저장 실패를 메시지로 표시한다. |
+| 비활성화 조건 | 평가 완료 전에는 저장 버튼을 비활성화한다. |
+
+### 31.116 탭 간 데이터 공유 원칙
+
+- 탭 간 데이터는 View 내부 상태가 아니라 AppController가 보유한 결과 객체를 기준으로 공유한다.
+- 파일 선택 탭의 입력은 임무 설정 확인 탭과 평가 실행 탭으로 이어진다.
+- 평가 결과는 결과 요약 탭, 상세 결과 탭, 시각화 탭, 리포트 저장 탭이 공통으로 사용한다.
+- 탭 간 동기화는 동일 데이터 객체를 다시 읽는 방식으로 관리하고, 각 탭이 서로의 위젯 내부 상태를 직접 참조하지 않는다.
+
+### 31.117 버튼 활성/비활성 규칙
+
+- `Idle`에서는 파일 선택 버튼은 활성화하고 평가 및 저장 버튼은 비활성화한다.
+- `FilesSelected`에서는 평가 실행 버튼을 활성화할 수 있으나 저장 버튼은 비활성화한다.
+- `Loading`, `Validating`, `Evaluating`, `Exporting`에서는 파일 선택, 평가 재실행, 리포트 저장 버튼을 제한한다.
+- `Completed`에서는 결과 조회와 리포트 저장을 활성화할 수 있다.
+- `Error`에서는 오류 확인과 파일 재선택만 허용하고 나머지 작업은 제한한다.
+
+### 31.118 오류 메시지 표시 규칙
+
+- 오류 메시지는 한국어로 간결하게 표시한다.
+- 검증 오류는 탭별 메시지 영역과 공통 상태 메시지 영역에 함께 표시할 수 있다.
+- 평가 중 오류는 현재 단계와 함께 표시한다.
+- 저장 오류는 저장 실패 원인과 함께 성공/실패 파일 목록을 표시할 수 있다.
+
+### 31.119 이미지 미리보기 처리 규칙
+
+- 상세 결과 탭에서 선택된 target의 매칭 이미지가 있으면 미리보기를 시도한다.
+- 이미지가 없거나 열 수 없으면 대체 텍스트를 표시한다.
+- 미리보기는 결과 조회용 기능이며 평가 계산에는 영향을 주지 않는다.
+
+### 31.120 UI와 Controller 책임 분리
+
+- View는 AppController만 호출하고 Service를 직접 호출하지 않는다.
+- AppController는 View에 표시할 데이터를 전달하지만 UI 위젯 내부 구현에는 의존하지 않는다.
+- View는 입력 수집과 결과 표시만 담당하고, 평가 로직과 저장 로직은 수행하지 않는다.
+- Service는 UI 위젯 상태를 알지 못하며, 필요한 결과를 객체 형태로 반환한다.
+
+### 31.121 UI 관련 테스트 기준
+
+- `tests/test_evaluator.py`는 평가 완료 후 View에 전달될 결과 객체가 올바른지 검증한다.
+- `tests/test_report_exporter.py`는 저장 탭이 사용하는 출력 구조가 올바른지 검증한다.
+- `tests/test_validator.py`는 파일 선택과 검증 오류 표시 흐름의 근거가 되는 입력 유효성을 검증한다.
+- `tests/test_matcher.py`와 `tests/test_score_calculator.py`는 상세 결과 탭과 시각화 탭이 사용하는 수치 결과를 검증한다.
+- UI 상태 전이 테스트는 `Idle`, `FilesSelected`, `Evaluating`, `Completed`, `Error` 상태에서 버튼 활성화 규칙이 일치하는지 확인해야 한다.
