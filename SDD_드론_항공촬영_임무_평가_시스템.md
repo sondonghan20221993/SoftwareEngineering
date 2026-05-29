@@ -2367,3 +2367,106 @@ classDiagram
 - 중복 target_id와 잘못된 target 구조는 임무 설정 검증 테스트로 검증한다.
 - image_path 파일 없음과 덮어쓰기 경고는 경로 처리 및 저장 테스트로 검증한다.
 - 중복 실행 요청은 UI 상태 전이 테스트로 검증한다.
+
+## 모듈별 Public Method 명세
+
+### 31.63 Public Method 명세의 목적
+
+이 섹션은 각 모듈이 외부에 공개하는 메서드의 입력, 출력, 책임, 오류 전달 방식을 고정해 Controller, Service, View 사이의 호출 계약을 명확히 하기 위한 것이다. Model은 순수 데이터 모델로 유지하고, 파일 파싱과 평가 계산은 Service 계층에서 수행하며, View는 Service를 직접 호출하지 않는다.
+
+### 31.64 FileLoader public method 표
+
+| 메서드명 | 입력 | 출력 | 책임 | 오류 처리 방식 | 호출 주체 | 관련 테스트 |
+|---|---|---|---|---|---|---|
+| load_mission_config(path) | `str \| Path` | `MissionConfig` | 임무 설정 JSON을 읽어 모델 객체로 변환한다. | 파싱 실패 또는 구조 오류는 로드 실패로 반환한다. | AppController | mission_config 로드 테스트 |
+| load_capture_log(path) | `str \| Path` | `list[CaptureRecord]` | 촬영 로그를 읽어 촬영 레코드 목록으로 변환한다. | 행 단위 오류는 검증 대상에서 제외할 수 있도록 반환한다. | AppController | capture_log 로드 테스트 |
+| load_collision_log(path) | `str \| Path` | `list[CollisionRecord]` | 충돌 로그를 읽어 충돌 레코드 목록으로 변환한다. | 파싱 실패 또는 형식 오류는 로드 실패로 반환한다. | AppController | collision_log 로드 테스트 |
+| load_all(file_paths) | `dict[str, str \| Path]` | `loaded_data` | 입력 파일을 일괄 로드해 이후 검증 가능한 형태로 묶는다. | 개별 파일 실패는 결과 객체에 실패 원인으로 전달한다. | AppController | 전체 입력 로드 테스트 |
+
+### 31.65 Validator public method 표
+
+| 메서드명 | 입력 | 출력 | 책임 | 오류 처리 방식 | 호출 주체 | 관련 테스트 |
+|---|---|---|---|---|---|---|
+| validate_mission_config(config) | `MissionConfig` | `validation_result` | 임무 설정의 구조, 중복, 값 범위를 검사한다. | Fatal 오류와 검증 오류를 구분해 반환한다. | AppController | mission_config 검증 테스트 |
+| validate_capture_records(records) | `list[CaptureRecord]` | `validation_result` | 촬영 레코드의 수치 값, 경로, 필수 필드를 검사한다. | 잘못된 row는 제외하고 오류를 누적한다. | AppController | capture_log 검증 테스트 |
+| validate_collision_records(records) | `list[CollisionRecord]` | `validation_result` | 충돌 레코드의 수치 값과 collision 해석을 검사한다. | 잘못된 row는 제외하고 오류를 누적한다. | AppController | collision_log 검증 테스트 |
+| validate_all(loaded_data) | `loaded_data` | `validation_result` | 전체 입력의 유효성을 종합 판단한다. | 검증 실패 시 오류 목록과 계속 가능 여부를 함께 반환한다. | AppController | 전체 입력 검증 테스트 |
+
+### 31.66 Matcher public method 표
+
+| 메서드명 | 입력 | 출력 | 책임 | 오류 처리 방식 | 호출 주체 | 관련 테스트 |
+|---|---|---|---|---|---|---|
+| build_cost_matrix(targets, captures, weights) | `list[TargetPoint]`, `list[CaptureRecord]`, `Weights` | `cost_matrix` | 목표와 촬영 기록 사이의 매칭 비용 행렬을 만든다. | 유효한 입력이 없으면 빈 행렬 또는 매칭 불가 결과를 반환한다. | Evaluator | 비용 행렬 계산 테스트 |
+| match_targets_to_captures(targets, captures, weights) | `list[TargetPoint]`, `list[CaptureRecord]`, `Weights` | `matched_pairs` | 전역 최적 1:1 매칭 결과를 계산한다. | 매칭 불가 시 결과 객체에서 실패를 표시한다. | Evaluator | 목표-촬영 매칭 테스트 |
+
+### 31.67 Evaluator public method 표
+
+| 메서드명 | 입력 | 출력 | 책임 | 오류 처리 방식 | 호출 주체 | 관련 테스트 |
+|---|---|---|---|---|---|---|
+| evaluate(mission_config, capture_records, collision_records) | `MissionConfig`, `list[CaptureRecord]`, `list[CollisionRecord]` | `eval_result` | 전체 평가 흐름을 조율하고 최종 결과를 만든다. | 내부 단계 실패는 결과 객체의 오류 상태로 전달한다. | AppController | 전체 평가 테스트 |
+| calculate_target_result(target, capture, mission_config) | `TargetPoint`, `CaptureRecord`, `MissionConfig` | `TargetResult` | 단일 목표의 위치, 방향, 시간 판정을 계산한다. | 매칭 실패 시 None 허용 필드를 포함한 결과를 반환한다. | evaluate() | 목표별 결과 계산 테스트 |
+| aggregate_result(target_results, score_detail) | `list[TargetResult]`, `ScoreDetail` | `EvalResult` | 목표별 결과와 감점 상세를 집계한다. | 집계 실패 시 오류가 포함된 결과를 반환한다. | evaluate() | 결과 집계 테스트 |
+
+### 31.68 ScoreCalculator public method 표
+
+| 메서드명 | 입력 | 출력 | 책임 | 오류 처리 방식 | 호출 주체 | 관련 테스트 |
+|---|---|---|---|---|---|---|
+| calculate_target_deduction(target_result, policy, tolerance) | `TargetResult`, `DeductionPolicy`, `Tolerance` | `float` | 단일 목표의 감점을 계산한다. | 계산 불가 시 0 또는 오류 결과 기준으로 처리한다. | Evaluator | 목표별 감점 테스트 |
+| calculate_score_detail(target_results, collision_count, policy, tolerance) | `list[TargetResult]`, `int`, `DeductionPolicy`, `Tolerance` | `ScoreDetail` | 전체 감점 상세를 계산한다. | 누락, 충돌, 시간 초과를 분리해 집계한다. | Evaluator | 감점 상세 계산 테스트 |
+| calculate_final_score(score_detail) | `ScoreDetail` | `float` | 최종 점수를 계산한다. | 총 감점이 100을 초과하면 0점으로 제한한다. | Evaluator | 최종 점수 계산 테스트 |
+
+### 31.69 ReportExporter public method 표
+
+| 메서드명 | 입력 | 출력 | 책임 | 오류 처리 방식 | 호출 주체 | 관련 테스트 |
+|---|---|---|---|---|---|---|
+| export_result_json(eval_result, save_path) | `EvalResult`, `str \| Path` | `export_result` | 평가 결과 JSON을 저장한다. | 저장 실패는 export 결과에 반영한다. | AppController | 결과 JSON 저장 테스트 |
+| export_result_csv(eval_result, save_path) | `EvalResult`, `str \| Path` | `export_result` | 평가 결과 요약 CSV를 저장한다. | 저장 실패는 export 결과에 반영한다. | AppController | 결과 CSV 저장 테스트 |
+| export_detail_csv(eval_result, save_path) | `EvalResult`, `str \| Path` | `export_result` | 목표별 상세 CSV를 저장한다. | 저장 실패는 export 결과에 반영한다. | AppController | 상세 CSV 저장 테스트 |
+| export_summary_json(eval_result, save_path) | `EvalResult`, `str \| Path` | `export_result` | 화면 요약용 JSON을 저장한다. | 저장 실패는 export 결과에 반영한다. | AppController | 요약 JSON 저장 테스트 |
+| export_all(eval_result, save_dir) | `EvalResult`, `str \| Path` | `export_result` | 기본 출력 파일을 일괄 저장한다. | 파일별 성공/실패 목록을 포함해 반환한다. | AppController | 전체 리포트 저장 테스트 |
+
+### 31.70 AppController public method 표
+
+| 메서드명 | 입력 | 출력 | 책임 | 오류 처리 방식 | 호출 주체 | 관련 테스트 |
+|---|---|---|---|---|---|---|
+| set_file_paths(file_paths) | `dict[str, str \| Path]` | `None` | 입력 파일 경로를 저장한다. | 잘못된 경로는 이후 로드 단계에서 처리한다. | View | 파일 경로 설정 테스트 |
+| load_inputs() | `None` | `loaded_data` | FileLoader를 통해 입력을 로드한다. | 로드 실패는 상태와 오류 목록으로 전달한다. | View | 입력 로드 오케스트레이션 테스트 |
+| validate_inputs() | `None` | `validation_result` | Validator를 통해 입력을 검증한다. | 검증 실패는 UI 표시용 결과로 전달한다. | View | 입력 검증 오케스트레이션 테스트 |
+| run_evaluation() | `None` | `eval_result` | 평가 실행을 조율한다. | 평가 실패는 결과 상태로 전달하고 UI에 알린다. | View | 평가 실행 오케스트레이션 테스트 |
+| export_report(save_dir) | `str \| Path` | `export_result` | 리포트 저장을 조율한다. | 저장 실패는 결과 객체로 전달한다. | View | 리포트 저장 오케스트레이션 테스트 |
+| reset_state() | `None` | `None` | 내부 상태를 초기화한다. | 오류 상태도 복구 가능한 상태로 되돌린다. | View | 상태 초기화 테스트 |
+
+### 31.71 View 계층 호출 메서드 표
+
+| 메서드명 | 입력 | 출력 | 책임 | 오류 처리 방식 | 호출 주체 | 관련 테스트 |
+|---|---|---|---|---|---|---|
+| show_file_paths(file_paths) | `dict[str, str \| Path]` | `None` | 선택된 파일 경로를 화면에 표시한다. | 표시 실패는 UI 내부 오류로 처리한다. | AppController | 파일 경로 표시 테스트 |
+| show_validation_errors(errors) | `list[str]` | `None` | 검증 오류를 사용자에게 보여준다. | 오류 목록을 읽기 전용으로 표시한다. | AppController | 검증 오류 표시 테스트 |
+| show_result_summary(eval_result) | `EvalResult` | `None` | 결과 요약을 화면에 표시한다. | 결과 객체가 없으면 표시를 생략한다. | AppController | 결과 요약 표시 테스트 |
+| show_target_details(target_results) | `list[TargetResult]` | `None` | 목표별 상세 결과를 화면에 표시한다. | 선택된 항목에 따라 부분 갱신할 수 있다. | AppController | 목표 상세 표시 테스트 |
+| show_export_status(export_result) | `export_result` | `None` | 저장 성공/실패 상태를 표시한다. | 파일별 성공/실패 목록을 함께 표시한다. | AppController | 저장 상태 표시 테스트 |
+| set_busy(is_busy) | `bool` | `None` | 평가 또는 저장 중 UI 상태를 전환한다. | busy 상태에서는 중복 실행을 차단한다. | AppController | busy 상태 전환 테스트 |
+
+### 31.72 메서드 호출 순서 설명
+
+- View는 사용자 입력을 받아 `AppController`의 진입 메서드를 호출한다.
+- `AppController`는 먼저 `load_inputs()`를 통해 FileLoader를 호출하고, 이어서 `validate_inputs()`를 호출한다.
+- 검증이 성공하면 `AppController`는 `run_evaluation()`을 통해 평가를 조율하며, 이 과정에서 `Evaluator`가 `Matcher`와 `ScoreCalculator`를 사용한다.
+- 평가가 완료되면 `AppController`는 `show_result_summary()`와 `show_target_details()`를 통해 View에 결과를 전달한다.
+- 사용자가 저장을 요청하면 `export_report()`가 실행되고, 결과는 `show_export_status()`로 표시된다.
+
+### 31.73 메서드 책임 분리 원칙
+
+- Controller는 직접 파일 파싱, 매칭, 점수 계산을 수행하지 않는다.
+- View는 Service를 직접 호출하지 않고, 반드시 Controller를 통해서만 요청을 전달한다.
+- Service는 View를 직접 호출하지 않고, 처리 결과를 반환하는 방식으로만 상호작용한다.
+- Model은 method 중심 로직을 갖지 않는 순수 데이터 모델로 유지한다.
+- 각 메서드는 단일 책임을 유지하고, 입출력과 오류 전달 방식이 문서화된 계약을 따라야 한다.
+
+### 31.74 반환값과 오류 전달 방식
+
+- 오류는 예외를 UI로 직접 던지지 않고 검증 결과 또는 export 결과 객체 형태로 전달한다.
+- 로드와 검증 단계의 실패는 `loaded_data`와 `validation_result`에 포함된 상태와 오류 목록으로 전달한다.
+- 평가 단계의 실패는 `eval_result`에 포함된 실패 상태와 상세 결과로 전달한다.
+- 저장 단계의 실패는 `export_result`에 포함된 성공/실패 파일 목록과 실패 원인으로 전달한다.
+- View는 이 결과 객체를 바탕으로 메시지와 화면 상태만 갱신하고, 로직 판정은 수행하지 않는다.
