@@ -3963,3 +3963,137 @@ final_score = max(0, 100 - total_deduction)
 - 파일명이 바뀌면 FileLoader, ReportExporter, 저장 경로 문서를 함께 수정한다.
 - 동일 용어에 새 의미를 추가하지 않고, 필요하면 새 용어를 정의한다.
 - 이 섹션의 표는 이후 구현과 테스트에서 우선 참조하는 고정 사전으로 사용한다.
+
+## 요구사항-설계 상세 추적성
+
+### 31.209 요구사항-설계 상세 추적성의 목적
+
+이 섹션은 SRS의 요구사항이 SDD의 어느 설계 요소, 데이터 모델, 서비스, UI, 테스트와 연결되는지 한눈에 확인하기 위한 기준이다. 검토자는 이 섹션을 통해 요구사항 누락, 설계 누락, 테스트 누락을 교차 점검할 수 있다.
+
+### 31.210 추적성 작성 기준
+
+- 요구사항 항목은 기능, 비기능, 입력, 출력, UI, 오류 처리, 성능으로 분리해 적는다.
+- 실제 SRS의 ID가 없으면 항목명 기반으로 추적한다.
+- 각 항목은 최소 하나의 SDD 섹션과 하나의 STD 시험 항목에 연결한다.
+- 동일 요구사항이 여러 설계 요소에 걸치면 대표 연결과 보조 연결을 함께 적는다.
+- 변경 시에는 연결된 SDD, STD, tests 범위를 함께 확인한다.
+
+### 31.211 기능 요구사항 추적성 표
+
+| 요구사항 항목 | 관련 SRS 위치 또는 항목 | 관련 SDD 설계 섹션 | 관련 데이터 모델 | 관련 서비스 또는 UI 모듈 | 관련 STD 시험 항목 | 검증 기준 | 변경 시 영향 범위 |
+|---|---|---|---|---|---|---|---|
+| 임무 설정 파일 로드 | mission_config 입력 요구사항 | 입력 파일 스키마, FileLoader 설계, 데이터 모델 관계도 | MissionConfig, TargetPoint, Tolerance, Weights, DeductionPolicy | FileLoader, Validator, View | mission_config 로드/검증 시험 | JSON 구조를 파싱하고 필수 필드를 검증한다. | 입력 스키마, 로딩 흐름, 오류 메시지 |
+| 촬영 로그 로드 | capture_log 입력 요구사항 | 입력 파일 스키마, 파일명 및 리포트 용어, 오류 처리 매트릭스 | CaptureRecord, Position, Direction | FileLoader, Validator | capture_log 로드 시험 | CSV 행을 읽고 필요한 필드를 매핑한다. | 입력 파서, 캡처 로그 검증, 결과 집계 |
+| 충돌 로그 로드 | collision_log 입력 요구사항 | 입력 파일 스키마, 데이터 모델 관계도, 오류 처리 매트릭스 | CollisionRecord | FileLoader, Validator | collision_log 로드 시험 | CSV 충돌 기록을 읽고 bool 필드를 해석한다. | 입력 검증, 충돌 집계, 감점 |
+| 입력 데이터 검증 | 입력 유효성 요구사항 | 오류 처리 매트릭스, 입력 파일 스키마, 설계 결정 기록 | MissionConfig, CaptureRecord, CollisionRecord | Validator, AppController | 입력 검증 시험 | 필수 필드, 타입, 범위, 파일 존재 여부를 검사한다. | 오류 정책, Recoverable 범위, 상태 전이 |
+| 목표-촬영 1:1 매칭 | 매칭 요구사항 | 알고리즘 상세 설계, 설계 결정 기록 | TargetResult, EvalResult | Matcher, Evaluator | Hungarian 매칭 시험 | 전역 최적 1:1 매칭을 수행한다. | 매칭 결과, 누락 판정, 점수 |
+| 위치 오차 계산 | 위치 오차 요구사항 | 알고리즘 상세 설계, 설계 결정 기록, 데이터 모델 관계도 | ScoreDetail, TargetResult | Evaluator, ScoreCalculator | 위치 오차 계산 시험 | 3D Euclidean distance로 계산한다. | 평균 오차, 감점, 리포트 |
+| 방향 오차 계산 | 방향 오차 요구사항 | 알고리즘 상세 설계, 설계 결정 기록 | ScoreDetail, TargetResult | Evaluator, ScoreCalculator, angle_utils | yaw/pitch 오차 계산 시험 | yaw wrap-around와 pitch 절댓값 차이를 적용한다. | 감점, 성공 판정, 평균 방향 오차 |
+| 시간 조건 판정 | 시간 조건 요구사항 | 알고리즘 상세 설계, 오류 처리 매트릭스 | TargetResult | Evaluator, Matcher | timeout 판정 시험 | capture.timestamp와 target.time_limit을 비교한다. | 성공 판정, timeout_count, 감점 |
+| 누락 판정 | 누락 처리 요구사항 | 상태 전이도, 오류 처리 매트릭스, 결과 집계 설계 | TargetResult, EvalResult | Evaluator, AppController | missing 판정 시험 | 매칭 실패 또는 기한 내 기록 부재를 누락으로 처리한다. | missing_count, 평균 오차, 최종 점수 |
+| 충돌 집계 | 충돌 처리 요구사항 | 데이터 모델 관계도, 알고리즘 상세 설계, 오류 처리 매트릭스 | CollisionRecord, EvalResult | Evaluator, ScoreCalculator | collision 집계 시험 | collision=true 기록을 집계한다. | collision_count, 감점, 요약 리포트 |
+| 감점 계산 | 점수 산정 요구사항 | 알고리즘 상세 설계, 설계 결정 기록, 결과 집계 설계 | ScoreDetail | ScoreCalculator | 감점 계산 시험 | 항목별 감점이 정책에 따라 계산된다. | final_score, total_deduction |
+| 최종 점수 계산 | 최종 점수 요구사항 | 결과 집계 설계, 설계 결정 기록 | EvalResult, ScoreDetail | ScoreCalculator, Evaluator | 최종 점수 계산 시험 | total_deduction을 반영해 final_score를 산출한다. | 결과 요약, 리포트, UI 표시 |
+| 결과 요약 표시 | 결과 요약 요구사항 | UI 탭별 상세 설계, 리포트 저장 상세 설계 | EvalResult | View, AppController | 결과 요약 표시 시험 | 총 대상 수, 성공 수, 누락 수, 감점이 표시된다. | UI 레이아웃, 상태 메시지 |
+| 상세 결과 표시 | 상세 결과 요구사항 | UI 탭별 상세 설계, 데이터 모델 관계도 | TargetResult, ScoreDetail | View, AppController | 상세 결과 표시 시험 | target별 판정과 오차가 표시된다. | 상세 리스트, 컬럼 구성 |
+| 리포트 저장 | 리포트 출력 요구사항 | 리포트 저장 상세 설계, 파일명 및 리포트 용어, 설계 결정 기록 | EvalResult, TargetResult, ScoreDetail | ReportExporter, AppController | 리포트 저장 시험 | JSON/CSV 파일이 지정된 이름으로 저장된다. | 출력 형식, 저장 경로, 상태 전이 |
+
+이 표는 기능 요구사항이 어느 설계 결정과 직결되는지를 추적하기 위한 핵심 표이다. 특히 매칭, 오차, 감점, 리포트는 서로 연결되므로 한 항목만 변경해도 인접 항목의 검증 기준이 함께 바뀔 수 있다.
+
+### 31.212 비기능 요구사항 추적성 표
+
+| 요구사항 항목 | 관련 SRS 위치 또는 항목 | 관련 SDD 설계 섹션 | 관련 데이터 모델 | 관련 서비스 또는 UI 모듈 | 관련 STD 시험 항목 | 검증 기준 | 변경 시 영향 범위 |
+|---|---|---|---|---|---|---|---|
+| 100MB 이하 입력 처리 | 성능 요구사항 | 성능 및 확장성 설계, 파일 로드 설계 | MissionConfig, CaptureRecord, CollisionRecord | FileLoader, Validator | 대용량 입력 처리 시험 | 100MB 이하 입력을 정상 처리한다. | 입력 처리 전략, 메모리 사용, 테스트 데이터 |
+| 30초 이내 평가 | 성능 요구사항 | 성능 및 확장성 설계, 알고리즘 상세 설계 | EvalResult, ScoreDetail | Evaluator, Matcher, ScoreCalculator | 평가 시간 시험 | 지정된 기준 환경에서 30초 이내에 평가를 끝낸다. | 알고리즘, 데이터 규모, 성능 검증 환경 |
+| UTF-8 파일 처리 | 인코딩 요구사항 | 입력 파일 스키마, 오류 처리 매트릭스 | MissionConfig, CaptureRecord, CollisionRecord | FileLoader, Validator | UTF-8 파일 처리 시험 | UTF-8로 저장된 입력을 읽고 해석한다. | 로딩 실패 정책, 문자 해석, 오류 메시지 |
+| UI 오류 메시지 표시 | UI 품질 요구사항 | UI 탭별 상세 설계, 오류 처리 매트릭스 | EvalResult, TargetResult | View, AppController | UI 오류 메시지 표시 시험 | 오류 발생 시 사용자용 메시지가 표시된다. | UI 문구, 상태 전이, 경고/오류 구분 |
+| 평가 중 중복 실행 방지 | 상태 안정성 요구사항 | 평가 실행 Sequence Diagram, 평가 상태 전이도, 오류 처리 매트릭스 | EvalResult | View, AppController | 중복 실행 방지 시험 | Evaluating 상태에서 재실행이 차단된다. | 버튼 비활성화, 상태 전이, 오류 메시지 |
+| 저장 실패 시 평가 결과 유지 | 안정성 요구사항 | 리포트 저장 상세 설계, 오류 처리 매트릭스 | EvalResult | ReportExporter, AppController, View | 저장 실패 처리 시험 | 저장 실패 후에도 계산된 결과가 유지된다. | 상태 전이, 결과 캐시, 재시도 흐름 |
+| 이미지 파일 지연 로드 | UI 성능 요구사항 | UI 탭별 상세 설계, 성능 및 확장성 설계 | CaptureRecord | View | 이미지 지연 로드 시험 | 이미지 미리보기는 필요 시점에만 로드한다. | View 렌더링, 파일 접근 시점, 메모리 사용 |
+| 입력 파일을 코드로 실행하지 않음 | 보안 요구사항 | 보안 및 안정성 설계, 오류 처리 매트릭스 | MissionConfig, CaptureRecord, CollisionRecord | FileLoader, Validator | 입력 안전성 시험 | 입력은 데이터로만 파싱하고 실행하지 않는다. | 파서 구현, 오류 처리, 보안 검증 |
+
+이 표는 비기능 요구사항이 성능, 안정성, 보안, UI 품질로 어떻게 분해되는지를 보여준다. 특히 파일 처리와 상태 전이는 비기능 요구사항이지만 구현에서는 기능 요구사항과 같은 수준으로 검증되어야 한다.
+
+### 31.213 입력 요구사항 추적성 표
+
+| 요구사항 항목 | 관련 SRS 위치 또는 항목 | 관련 SDD 설계 섹션 | 관련 데이터 모델 | 관련 서비스 또는 UI 모듈 | 관련 STD 시험 항목 | 검증 기준 | 변경 시 영향 범위 |
+|---|---|---|---|---|---|---|---|
+| mission_config.json | 입력 형식 요구사항 | 입력 파일 스키마 상세 설계, 데이터 모델 관계도 | MissionConfig | FileLoader, Validator | mission_config 입력 시험 | JSON 구조와 필수 필드를 만족해야 한다. | 설정 구조, 기본값, 검증 규칙 |
+| capture_log.csv | 입력 형식 요구사항 | 입력 파일 스키마 상세 설계, 오류 처리 매트릭스 | CaptureRecord | FileLoader, Validator | capture_log 입력 시험 | CSV 컬럼과 타입이 정의와 일치해야 한다. | 로그 파싱, 행 오류 처리, 시간/오차 계산 |
+| collision_log.csv | 입력 형식 요구사항 | 입력 파일 스키마 상세 설계, 오류 처리 매트릭스 | CollisionRecord | FileLoader, Validator | collision_log 입력 시험 | CSV 충돌 기록을 파싱할 수 있어야 한다. | 충돌 집계, 감점, 필수 입력 정책 |
+| image_path | 이미지 참조 요구사항 | UI 탭별 상세 설계, 보안 및 안정성 설계 | CaptureRecord | View, Validator | image_path 처리 시험 | 경로가 존재하지 않아도 Warning으로 처리할 수 있다. | 미리보기, 경고 메시지, 파일 접근 정책 |
+
+이 표는 입력이 어느 모델과 검증 흐름으로 들어오는지 고정하기 위한 표이다. 입력 파일명이나 컬럼명이 바뀌면 이 표와 함께 파서, 검증, 테스트가 함께 바뀌어야 한다.
+
+### 31.214 출력 요구사항 추적성 표
+
+| 요구사항 항목 | 관련 SRS 위치 또는 항목 | 관련 SDD 설계 섹션 | 관련 데이터 모델 | 관련 서비스 또는 UI 모듈 | 관련 STD 시험 항목 | 검증 기준 | 변경 시 영향 범위 |
+|---|---|---|---|---|---|---|---|
+| eval_result.json | 결과 출력 요구사항 | 리포트 저장 상세 설계, 파일명 및 리포트 용어 | EvalResult, TargetResult, ScoreDetail | ReportExporter | eval_result JSON 저장 시험 | 상세 결과가 JSON으로 저장되어야 한다. | 파일 구조, 필드명, 저장 경로 |
+| eval_summary.json | 결과 출력 요구사항 | 리포트 저장 상세 설계, 결과 집계 설계 | EvalResult | ReportExporter, View | eval_summary JSON 저장 시험 | 요약 결과가 JSON으로 저장되어야 한다. | 요약 필드, 결과 집계, UI 표시 |
+| eval_result.csv | 결과 출력 요구사항 | 리포트 저장 상세 설계, 파일명 및 리포트 용어 | EvalResult, TargetResult, ScoreDetail | ReportExporter | eval_result CSV 저장 시험 | 결과 상세가 CSV로 저장되어야 한다. | 컬럼 구성, 행 수, 정렬 기준 |
+| eval_detail.csv | 결과 출력 요구사항 | 리포트 저장 상세 설계, 결과 집계 설계 | TargetResult, ScoreDetail | ReportExporter | eval_detail CSV 저장 시험 | 타깃별 상세가 CSV로 저장되어야 한다. | 타깃별 컬럼, 감점 상세, 집계 기준 |
+
+이 표는 저장 파일의 이름과 내용 구조를 고정하기 위한 표이다. 리포트 포맷이 바뀌면 UI 저장 흐름과 외부 문서의 파일명도 함께 확인해야 한다.
+
+### 31.215 UI 요구사항 추적성 표
+
+| 요구사항 항목 | 관련 SRS 위치 또는 항목 | 관련 SDD 설계 섹션 | 관련 데이터 모델 | 관련 서비스 또는 UI 모듈 | 관련 STD 시험 항목 | 검증 기준 | 변경 시 영향 범위 |
+|---|---|---|---|---|---|---|---|
+| 파일 선택 탭 | UI 요구사항 | UI 탭별 상세 설계 | MissionConfig, CaptureRecord, CollisionRecord | View, AppController | 파일 선택 탭 시험 | 입력 파일을 선택하고 상태가 갱신되어야 한다. | 파일 선택 이벤트, 상태 전이 |
+| 임무 설정 확인 탭 | UI 요구사항 | UI 탭별 상세 설계, 데이터 모델 관계도 | MissionConfig | View | 임무 설정 확인 탭 시험 | mission 설정이 사람이 읽을 수 있게 보여야 한다. | 표시 필드, 레이아웃, 문구 |
+| 평가 실행 탭 | UI 요구사항 | 평가 실행 Sequence Diagram, 평가 상태 전이도 | EvalResult | View, AppController | 평가 실행 탭 시험 | 평가 시작과 상태 표시가 연결되어야 한다. | 버튼 활성화, 진행 상태, 중복 실행 방지 |
+| 결과 요약 탭 | UI 요구사항 | UI 탭별 상세 설계, 결과 집계 설계 | EvalResult | View | 결과 요약 탭 시험 | 최종 점수와 요약 카운트가 표시되어야 한다. | 요약 위젯, 숫자 포맷, 상태 메시지 |
+| 상세 결과 탭 | UI 요구사항 | UI 탭별 상세 설계, 데이터 모델 관계도 | TargetResult, ScoreDetail | View | 상세 결과 탭 시험 | target별 판정과 오차가 표시되어야 한다. | 상세 테이블, 행 구성, 정렬 |
+| 시각화 탭 | UI 요구사항 | UI 탭별 상세 설계, 성능 및 확장성 설계 | EvalResult, TargetResult | View | 시각화 탭 시험 | 그래프나 미리보기가 표시되어야 한다. | 렌더링 방식, 그래프 종류, 로딩 전략 |
+| 리포트 저장 탭 | UI 요구사항 | UI 탭별 상세 설계, 리포트 저장 상세 설계 | EvalResult | View, AppController, ReportExporter | 리포트 저장 탭 시험 | 저장 파일과 경로를 선택할 수 있어야 한다. | 저장 경로, 버튼 상태, 오류 표시 |
+
+이 표는 사용자가 직접 보는 화면과 내부 설계의 연결을 고정한다. 탭 구성이 바뀌면 관련 상태 전이와 저장 흐름도 같이 점검해야 한다.
+
+### 31.216 오류 처리 요구사항 추적성 표
+
+| 요구사항 항목 | 관련 SRS 위치 또는 항목 | 관련 SDD 설계 섹션 | 관련 데이터 모델 | 관련 서비스 또는 UI 모듈 | 관련 STD 시험 항목 | 검증 기준 | 변경 시 영향 범위 |
+|---|---|---|---|---|---|---|---|
+| Fatal 오류 | 오류 처리 요구사항 | 오류 처리 매트릭스, 보안 및 안정성 설계 | EvalResult | AppController, View | Fatal 오류 처리 시험 | 계속 진행이 불가능하면 Error 상태로 전환한다. | 상태 전이, 종료 흐름, 사용자 메시지 |
+| Recoverable 오류 | 오류 처리 요구사항 | 오류 처리 매트릭스, 입력 파일 스키마 | MissionConfig, CaptureRecord, CollisionRecord | FileLoader, Validator, View | Recoverable 오류 처리 시험 | 일부 오류는 경고 후 계속 진행할 수 있다. | 경고 정책, 행 스킵, 결과 유지 |
+| Warning | 오류 처리 요구사항 | 오류 처리 매트릭스, UI 탭별 상세 설계 | CaptureRecord | View, Validator | Warning 표시 시험 | 즉시 실패가 아닌 주의 메시지를 표시한다. | UI 메시지, 로깅, 미리보기 |
+| Info | 오류 처리 요구사항 | 오류 처리 매트릭스, UI 탭별 상세 설계 | EvalResult | View, AppController | Info 메시지 시험 | 진행 안내나 상태 알림을 표시한다. | 상태 메시지, 진행바, 로그 |
+| Error 상태 전이 | 오류 처리 요구사항 | 평가 상태 전이도, 오류 처리 매트릭스 | EvalResult | AppController, View | Error 상태 전이 시험 | 치명적 실패 시 Error 상태로 이동한다. | 버튼 상태, 재시도 흐름, 결과 유지 |
+| 오류 목록 관리 | 오류 처리 요구사항 | 오류 처리 매트릭스, 결과 집계 설계 | EvalResult | AppController, View | 오류 목록 관리 시험 | 오류를 목록으로 누적하고 사용자에게 보여준다. | 오류 리스트, 스크롤, 상세 메시지 |
+| UI 오류 메시지 | 오류 처리 요구사항 | UI 탭별 상세 설계, 오류 처리 매트릭스 | EvalResult | View | UI 오류 메시지 시험 | 사용자에게 의미 있는 메시지를 보여준다. | 문구, 색상, 표시 위치 |
+
+이 표는 오류를 상태, 메시지, 복구 가능성으로 분리해 해석하기 위한 표이다. Fatal과 Recoverable의 구분이 바뀌면 입력 검증과 UI 상태 전이도 함께 바뀐다.
+
+### 31.217 성능 요구사항 추적성 표
+
+| 요구사항 항목 | 관련 SRS 위치 또는 항목 | 관련 SDD 설계 섹션 | 관련 데이터 모델 | 관련 서비스 또는 UI 모듈 | 관련 STD 시험 항목 | 검증 기준 | 변경 시 영향 범위 |
+|---|---|---|---|---|---|---|---|
+| 100MB 이하 입력 처리 | 성능 요구사항 | 성능 및 확장성 설계, 입력 파일 스키마 | MissionConfig, CaptureRecord, CollisionRecord | FileLoader, Validator | 대용량 입력 성능 시험 | 100MB 이하 입력을 안정적으로 처리해야 한다. | 파일 분할 여부, 로딩 전략, 테스트 데이터셋 |
+| 30초 이내 평가 | 성능 요구사항 | 성능 및 확장성 설계, 알고리즘 상세 설계 | EvalResult, ScoreDetail | Evaluator, Matcher, ScoreCalculator | 평가 시간 성능 시험 | 기준 환경에서 30초 이내 평가를 완료해야 한다. | 매칭 알고리즘, 성능 기준, 입력 규모 |
+| UTF-8 파일 처리 | 인코딩 요구사항 | 입력 파일 스키마, 성능 및 안정성 설계 | MissionConfig, CaptureRecord, CollisionRecord | FileLoader, Validator | UTF-8 인코딩 시험 | UTF-8 입력을 정상 해석해야 한다. | 파서, 문자 해석, 오류 메시지 |
+| UI 오류 메시지 표시 | UI/성능 교차 요구사항 | UI 탭별 상세 설계, 오류 처리 매트릭스 | EvalResult | View | UI 반응성 시험 | 오류 발생 시 즉시 표시되어야 한다. | UI 렌더링, 메시지 처리, 상태 전이 |
+| 평가 중 중복 실행 방지 | 안정성 요구사항 | 평가 상태 전이도, 오류 처리 매트릭스 | EvalResult | View, AppController | 중복 실행 방지 시험 | 평가 중 재실행이 차단되어야 한다. | 버튼 활성화, 상태 관리, 오류 메시지 |
+| 저장 실패 시 평가 결과 유지 | 안정성 요구사항 | 리포트 저장 상세 설계, 오류 처리 매트릭스 | EvalResult | ReportExporter, AppController, View | 저장 실패 안정성 시험 | 저장 실패 후 결과가 소실되지 않아야 한다. | 상태 복구, 결과 캐시, 재시도 |
+| 이미지 파일 지연 로드 | UI 성능 요구사항 | UI 탭별 상세 설계, 성능 및 확장성 설계 | CaptureRecord | View | 이미지 지연 로드 시험 | 미리보기는 필요한 시점에만 로드해야 한다. | 렌더링, 메모리, 파일 접근 타이밍 |
+| 입력 파일을 코드로 실행하지 않음 | 보안 요구사항 | 보안 및 안정성 설계, 오류 처리 매트릭스 | MissionConfig, CaptureRecord, CollisionRecord | FileLoader, Validator | 입력 안전성 시험 | 입력은 데이터로만 처리되어야 한다. | 파서 보안, 실행 금지, 오류 처리 |
+
+이 표는 성능과 안정성이 서로 독립이 아니라는 점을 보여준다. 처리 시간, UI 반응성, 저장 안정성은 서로 다른 시험이지만 같은 입력 규모와 상태 전이에 의해 함께 흔들릴 수 있다.
+
+### 31.218 추적성 누락 점검 기준
+
+- 각 기능 요구사항이 최소 하나의 SDD 섹션과 연결되어 있는지 확인한다.
+- 각 비기능 요구사항이 최소 하나의 STD 시험 항목과 연결되어 있는지 확인한다.
+- 입력 파일과 출력 파일이 모두 데이터 모델과 서비스 모듈에 연결되어 있는지 확인한다.
+- UI 탭이 상태 전이와 결과 집계 중 적어도 하나와 연결되어 있는지 확인한다.
+- 오류 처리 항목이 Fatal, Recoverable, Warning, Info, Error 상태와 모두 일관되는지 확인한다.
+- 요구사항 항목명과 표의 검증 기준이 서로 다른 의미로 쓰이지 않는지 확인한다.
+
+### 31.219 추적성 변경 관리 기준
+
+- 요구사항 항목이 바뀌면 SRS 항목명과 이 섹션의 표를 함께 수정한다.
+- 설계 섹션이 바뀌면 연결된 데이터 모델, 서비스, UI 모듈, STD 항목을 함께 수정한다.
+- 필드명이나 파일명이 바뀌면 입력, 출력, 리포트, 테스트 표를 모두 확인한다.
+- 기능과 비기능의 경계가 바뀌면 인접한 표를 함께 검토한다.
+- 추적성 항목은 누락되면 안 되며, 중복이 필요하면 대표 항목과 보조 항목으로 구분해 기록한다.
+- 변경 후에는 이 섹션의 표를 기준으로 문서 전체의 참조 일치 여부를 재점검한다.
