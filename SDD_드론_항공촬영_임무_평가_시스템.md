@@ -1899,3 +1899,91 @@ stateDiagram-v2
 - Controller는 파일 로드 완료 여부, 검증 통과 여부, 평가 결과 생성 여부, 저장 진행 여부를 상태값에 반영해야 한다.
 - Controller는 평가 중에 파일 선택과 리포트 저장 요청이 동시에 들어오지 않도록 상태 기반으로 입력을 차단해야 한다.
 - Service 계층은 상태값을 직접 보관하거나 UI 상태를 변경하지 않고, 처리 결과만 Controller에 반환해야 한다.
+
+## 모듈 의존성 다이어그램
+
+### 31.24 모듈 의존성 다이어그램의 목적
+
+이 다이어그램은 패키지 간 참조 방향을 고정해 계층 분리를 유지하기 위한 설계 기준을 제시한다. 특히 View는 UI 표시만 담당하고, Controller는 UI와 Service를 중재하며, Service는 평가 로직을 수행하고, Model은 순수 데이터 구조로 유지되어야 한다는 점을 명확히 한다.
+
+### 31.25 Mermaid flowchart 다이어그램
+
+```mermaid
+flowchart LR
+  ViewPkg[view package]
+  ControllerPkg[controller package]
+  ServicePkg[service package]
+  ModelPkg[model package]
+  UtilsPkg[utils package]
+  TestsPkg[tests package]
+
+  ViewPkg --> ControllerPkg
+  ControllerPkg --> ServicePkg
+  ControllerPkg --> ModelPkg
+  ServicePkg --> ModelPkg
+  ServicePkg --> UtilsPkg
+  TestsPkg -.-> ViewPkg
+  TestsPkg -.-> ControllerPkg
+  TestsPkg -.-> ServicePkg
+  TestsPkg -.-> ModelPkg
+  TestsPkg -.-> UtilsPkg
+```
+
+### 31.26 패키지별 책임 설명
+
+| 패키지 | 책임 | 참조 대상 |
+|---|---|---|
+| view package | 사용자 입력 수집, 화면 표시, 상태 반영 | controller package |
+| controller package | UI와 평가 서비스를 중재, 실행 순서 제어, 상태 전달 | service package, model package |
+| service package | 파일 로드, 검증, 매칭, 점수 계산, 저장 처리 | model package, utils package |
+| model package | 임무, 로그, 결과를 담는 순수 데이터 구조 제공 | 다른 계층에 의존하지 않음 |
+| utils package | 각도 계산 등 범용 보조 함수 제공 | 상위 계층에 의존하지 않음 |
+| tests package | 공개 인터페이스 기준의 단위/통합 테스트 | 모든 계층 |
+
+### 31.27 허용 의존 관계
+
+| from | to | 허용 이유 |
+|---|---|---|
+| view package | controller package | UI 이벤트를 Controller로 전달해야 한다. |
+| controller package | service package | 평가 실행과 저장 흐름을 위임해야 한다. |
+| controller package | model package | 결과와 입력 모델을 다루기 위해 참조가 필요하다. |
+| service package | model package | 입력과 결과를 구조화된 데이터로 처리해야 한다. |
+| service package | utils package | 각도 계산, 공통 계산 함수를 사용해야 한다. |
+| tests package | 모든 계층 | 구현을 검증하기 위한 참조가 허용된다. |
+
+### 31.28 금지 의존 관계
+
+| from | to | 금지 이유 |
+|---|---|---|
+| model package | view package | 모델은 순수 데이터 구조여야 하며 UI를 알아서는 안 된다. |
+| model package | controller package | 모델은 제어 흐름을 포함하지 않아야 한다. |
+| model package | service package | 모델은 처리 로직에 의존하지 않아야 한다. |
+| utils package | view package | utils는 범용 계산 함수만 제공해야 한다. |
+| utils package | controller package | utils는 상태나 UI 흐름을 알면 안 된다. |
+| utils package | service package | utils는 상위 계층에 의존하면 안 된다. |
+| service package | view package | Service는 UI 위젯을 직접 알면 안 된다. |
+
+### 31.29 순환 참조 방지 원칙
+
+- 계층 간 의존은 단방향으로 유지하고, 상위 계층이 하위 계층을 호출하는 방향만 허용한다.
+- `view -> controller -> service -> model/utils`의 흐름을 유지해 역참조를 차단한다.
+- `model`과 `utils`는 재사용 가능한 저수준 계층으로 두고, 상위 계층의 상태나 UI 객체를 참조하지 않는다.
+- 공통 기능이 필요할 때는 상위 계층으로 끌어올리지 말고 `utils` 또는 `model`의 책임으로 분리한다.
+
+### 31.30 구현 시 import 규칙
+
+- `view`는 `controller`만 직접 import하고, `service`를 직접 import하지 않는다.
+- `controller`는 `service`와 `model`을 import할 수 있지만, UI 위젯 모듈은 직접 import하지 않는다.
+- `service`는 `model`과 `utils`만 import하고, `view`와 `controller`를 import하지 않는다.
+- `model`은 다른 계층을 import하지 않는다.
+- `utils`는 공통 계산 함수만 포함하고, 상위 계층 import를 추가하지 않는다.
+- `tests`는 검증 목적에 한해 각 계층의 공개 인터페이스를 import할 수 있다.
+
+### 31.31 계층별 변경 영향도
+
+- `view package` 변경은 주로 사용자 경험과 이벤트 전달에 영향을 주며, 계산 로직에는 직접 영향을 주지 않아야 한다.
+- `controller package` 변경은 화면 상태 전이와 Service 호출 순서에 영향을 주므로, UI와 Service 경계에서 가장 주의 깊게 검토해야 한다.
+- `service package` 변경은 평가 결과와 저장 결과에 직접 영향을 주므로, 결과 형식과 검증 규칙의 회귀 여부를 함께 확인해야 한다.
+- `model package` 변경은 데이터 계약을 바꾸는 것이므로, Service와 테스트 전반에 영향이 퍼질 수 있다.
+- `utils package` 변경은 수치 계산 결과에 영향을 줄 수 있으므로, 관련 단위 테스트를 우선적으로 재검증해야 한다.
+- `tests package` 변경은 실제 실행 로직을 바꾸지 않지만, 설계 기준과 실제 구현이 일치하는지 확인하는 기준점 역할을 한다.
