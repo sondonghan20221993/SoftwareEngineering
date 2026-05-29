@@ -1987,3 +1987,176 @@ flowchart LR
 - `model package` 변경은 데이터 계약을 바꾸는 것이므로, Service와 테스트 전반에 영향이 퍼질 수 있다.
 - `utils package` 변경은 수치 계산 결과에 영향을 줄 수 있으므로, 관련 단위 테스트를 우선적으로 재검증해야 한다.
 - `tests package` 변경은 실제 실행 로직을 바꾸지 않지만, 설계 기준과 실제 구현이 일치하는지 확인하는 기준점 역할을 한다.
+
+## 데이터 모델 관계도
+
+### 31.32 데이터 모델 관계도의 목적
+
+이 관계도는 입력 모델, 로그 모델, 결과 모델 사이의 포함 관계와 데이터 흐름을 시각화하기 위한 것이다. 특히 모델이 순수 데이터 구조로 유지되어야 하며, 결과 모델은 입력 모델과 분리된 산출물이라는 점을 명확히 한다.
+
+### 31.33 Mermaid classDiagram
+
+```mermaid
+classDiagram
+  class Position {
+    +float x
+    +float y
+    +float z
+  }
+
+  class Direction {
+    +float yaw
+    +float pitch
+  }
+
+  class TargetPoint {
+    +str target_id
+    +Position position
+    +Direction direction
+    +float time_limit
+  }
+
+  class Tolerance {
+    +float position
+    +float yaw
+    +float pitch
+  }
+
+  class Weights {
+    +float position
+    +float direction
+  }
+
+  class DeductionPolicy {
+    +float position
+    +float yaw
+    +float pitch
+    +float timeout
+    +float missing
+    +float collision
+  }
+
+  class MissionConfig {
+    +str mission_name
+    +list~TargetPoint~ targets
+    +Tolerance tolerance
+    +Weights weights
+    +DeductionPolicy deduction_policy
+  }
+
+  class CaptureRecord {
+    +float timestamp
+    +Position position
+    +Direction direction
+    +str image_path
+  }
+
+  class CollisionRecord {
+    +float timestamp
+    +bool collision
+    +Position position
+  }
+
+  class TargetResult {
+    +str target_id
+    +float | None matched_capture_timestamp
+    +float | None position_error
+    +float | None yaw_error
+    +float | None pitch_error
+    +bool position_ok
+    +bool direction_ok
+    +bool time_ok
+    +bool missing
+    +bool success
+    +float deduction
+  }
+
+  class ScoreDetail {
+    +float position_deduction
+    +float yaw_deduction
+    +float pitch_deduction
+    +float timeout_deduction
+    +float missing_deduction
+    +float collision_deduction
+    +float total_deduction
+  }
+
+  class EvalResult {
+    +float final_score
+    +int total_targets
+    +int success_count
+    +int missing_count
+    +int timeout_count
+    +int collision_count
+    +float | None average_position_error
+    +float | None average_yaw_error
+    +float | None average_pitch_error
+    +ScoreDetail score_detail
+    +list~TargetResult~ target_results
+  }
+
+  MissionConfig "1" *-- "many" TargetPoint
+  TargetPoint "1" *-- "1" Position
+  TargetPoint "1" *-- "1" Direction
+  CaptureRecord "1" *-- "1" Position
+  CaptureRecord "1" *-- "1" Direction
+  CollisionRecord "1" *-- "1" Position
+  EvalResult "1" *-- "many" TargetResult
+  EvalResult "1" *-- "1" ScoreDetail
+```
+
+### 31.34 주요 데이터 모델 설명
+
+| 모델 | 구분 | 핵심 역할 | 단위/특징 |
+|---|---|---|---|
+| Position | 입력/로그 공통 | 3차원 좌표를 표현한다. | 좌표 단위는 meter이다. |
+| Direction | 입력/로그 공통 | 촬영 방향을 표현한다. | 각도 단위는 degree이다. |
+| TargetPoint | 입력 모델 | 목표 위치, 방향, 제한 시간을 정의한다. | 시간 단위는 second이다. |
+| Tolerance | 입력 모델 | 위치, yaw, pitch 허용 오차를 담는다. | 각도와 거리 기준을 함께 표현한다. |
+| Weights | 입력 모델 | 매칭 비용 계산용 가중치를 담는다. | 위치와 방향 가중치를 구분한다. |
+| DeductionPolicy | 입력 모델 | 항목별 감점 기준을 담는다. | 감점 정책은 평가 기준 입력이다. |
+| MissionConfig | 입력 모델 | 임무 전체 설정을 묶는다. | 여러 TargetPoint를 포함한다. |
+| CaptureRecord | 로그 모델 | 촬영 시각, 위치, 방향, 이미지 경로를 담는다. | 좌표 단위는 meter, 각도 단위는 degree이다. |
+| CollisionRecord | 로그 모델 | 충돌 시각, 충돌 여부, 위치를 담는다. | collision은 bool 판정값이다. |
+| TargetResult | 결과 모델 | 목표별 평가 결과를 담는다. | 성공, 누락, 시간 판정 포함이다. |
+| ScoreDetail | 결과 모델 | 감점 항목별 상세 결과를 담는다. | 최종 점수 계산의 근거이다. |
+| EvalResult | 결과 모델 | 전체 평가의 집계 결과를 담는다. | 목표별 결과와 감점 상세를 포함한다. |
+
+### 31.35 모델 간 포함 관계
+
+- `MissionConfig`는 여러 `TargetPoint`를 포함하며, 각 `TargetPoint`는 하나의 `Position`과 하나의 `Direction`을 포함한다.
+- `CaptureRecord`는 촬영 시점의 좌표와 방향을 함께 보관하기 위해 `Position`과 `Direction`을 포함한다.
+- `CollisionRecord`는 충돌이 발생한 시점의 위치를 나타내기 위해 `Position`을 포함한다.
+- `EvalResult`는 여러 `TargetResult`를 포함하고, 감점 집계를 표현하기 위해 `ScoreDetail`을 포함한다.
+- `TargetResult`는 평가 후 산출되는 목표별 결과이며, 입력 모델과 결과 모델을 연결하는 중간 산출물이다.
+
+### 31.36 입력 모델과 결과 모델의 분리 원칙
+
+- 입력 모델은 임무 설정과 로그를 표현하고, 결과 모델은 평가 후 산출된 값을 표현한다.
+- 입력 모델에는 평가 결과를 저장하지 않으며, 결과 모델에는 원본 입력 파일의 구조를 그대로 복제하지 않는다.
+- `MissionConfig`, `CaptureRecord`, `CollisionRecord`는 입력과 기록을 위한 모델이고, `TargetResult`, `ScoreDetail`, `EvalResult`는 평가 산출물을 위한 모델이다.
+- 이 분리는 평가 로직과 출력 형식을 분리해 설계 변경 시 영향 범위를 줄이기 위한 것이다.
+
+### 31.37 None 허용 필드 설명
+
+- `TargetResult.position_error`, `yaw_error`, `pitch_error`는 누락 target이면 `None`이 될 수 있다.
+- `TargetResult.matched_capture_timestamp`는 매칭 실패 시 `None`이 될 수 있다.
+- `EvalResult.average_position_error`, `average_yaw_error`, `average_pitch_error`는 계산 가능한 매칭 결과가 없으면 `None`이 될 수 있다.
+- `None` 허용은 값이 없음을 명시하기 위한 것으로, 0과 동일하게 해석하면 안 된다.
+
+### 31.38 bool 판정 필드 설명
+
+- `TargetResult.position_ok`는 위치 오차가 허용 범위 이내이면 `true`이다.
+- `TargetResult.direction_ok`는 yaw와 pitch 오차가 모두 허용 범위 이내이면 `true`이다.
+- `TargetResult.time_ok`는 제한 시간 이내에 촬영되었으면 `true`이다.
+- `TargetResult.missing`은 매칭된 촬영 기록이 없을 때 `true`이다.
+- `TargetResult.success`는 `position_ok`, `direction_ok`, `time_ok`가 모두 `true`일 때 `true`이다.
+- `CollisionRecord.collision`은 충돌 판정 결과를 나타내는 bool 값이다.
+
+### 31.39 모델 변경 시 영향 범위
+
+- `Position`이나 `Direction` 구조가 바뀌면 입력 모델, 로그 모델, 결과 계산에 연쇄 영향이 생긴다.
+- `MissionConfig`의 필드가 바뀌면 파일 로더, 검증기, 매칭 로직, UI 확인 화면에 영향을 준다.
+- `TargetResult` 또는 `ScoreDetail`이 바뀌면 결과 요약, 상세 결과, 리포트 저장 형식이 함께 수정되어야 한다.
+- `EvalResult`가 바뀌면 화면 표시, 저장 파일, 테스트 기준이 함께 갱신되어야 한다.
+- 모델 변경은 상위 서비스와 UI의 직접적인 데이터 계약 변경이므로, 관련 계층을 함께 검토해야 한다.
