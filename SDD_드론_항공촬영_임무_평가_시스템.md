@@ -2621,3 +2621,165 @@ final_score = max(0, 100 - total_deduction)
 - `tests/test_score_calculator.py`는 감점 계산, total_deduction, final_score 계산을 검증한다.
 - 경계값 테스트는 허용 오차와 제한 시간이 정확히 같은 입력을 포함해야 한다.
 - 매칭 불일치 테스트는 목표 수와 촬영 수가 다른 경우의 missing과 unused capture 처리를 확인해야 한다.
+
+## 리포트 저장 상세 설계
+
+### 31.90 리포트 저장 상세 설계의 목적
+
+이 섹션은 평가 결과를 JSON과 CSV로 일관되게 저장하기 위한 출력 구조, 직렬화 규칙, 파일명 규칙, 저장 실패 처리 기준을 정의한다. `ReportExporter`는 저장만 담당하고 UI는 결과 메시지 표시만 담당해야 하며, 저장 실패가 발생해도 평가 결과 자체는 유지되어야 한다.
+
+### 31.91 출력 파일 목록 표
+
+| 파일명 | 목적 | 형식 | 대상 데이터 |
+|---|---|---|---|
+| eval_result.json | 전체 평가 결과의 구조화 저장 | JSON | 요약 + 상세 결과 |
+| eval_summary.json | 화면 요약용 핵심 집계 저장 | JSON | 최종 점수와 집계값 |
+| eval_result.csv | 전체 평가 요약의 단일 행 저장 | CSV | 요약 데이터 |
+| eval_detail.csv | 목표별 상세 결과의 행 단위 저장 | CSV | target별 상세 데이터 |
+
+### 31.92 eval_result.json 상세 구조
+
+`eval_result.json`에는 다음 정보를 포함한다.
+
+- `final_score`
+- `total_targets`
+- `success_count`
+- `missing_count`
+- `timeout_count`
+- `collision_count`
+- `average_position_error`
+- `average_yaw_error`
+- `average_pitch_error`
+- `score_detail`
+- `target_results`
+
+구조 설명:
+
+- `score_detail`은 감점 항목별 합계를 담는 객체이다.
+- `target_results`는 목표별 상세 결과 배열이다.
+- 각 값은 데이터 모델과 동일한 이름을 유지한다.
+
+### 31.93 eval_summary.json 상세 구조
+
+`eval_summary.json`에는 다음 정보를 포함한다.
+
+- `final_score`
+- `total_targets`
+- `success_count`
+- `missing_count`
+- `timeout_count`
+- `collision_count`
+- `total_deduction`
+
+구조 설명:
+
+- `eval_summary.json`은 화면 요약과 리포트 검토를 위한 핵심 집계만 포함한다.
+- 상세 target 정보는 포함하지 않는다.
+- `total_deduction`은 `ScoreDetail`의 총 감점값과 일치해야 한다.
+
+### 31.94 eval_result.csv 컬럼 설계
+
+`eval_result.csv`는 전체 평가 요약 단일 행 파일로 설계한다.
+
+| 컬럼명 | 의미 |
+|---|---|
+| final_score | 최종 점수 |
+| total_targets | 전체 목표 수 |
+| success_count | 성공 목표 수 |
+| missing_count | 누락 목표 수 |
+| timeout_count | 시간 초과 목표 수 |
+| collision_count | 충돌 수 |
+| average_position_error | 평균 위치 오차 |
+| average_yaw_error | 평균 yaw 오차 |
+| average_pitch_error | 평균 pitch 오차 |
+| total_deduction | 총 감점 |
+
+### 31.95 eval_detail.csv 컬럼 설계
+
+`eval_detail.csv`는 target별 상세 결과 파일로 설계한다.
+
+| 컬럼명 | 의미 |
+|---|---|
+| target_id | 목표 ID |
+| matched_capture_timestamp | 매칭된 촬영 시각 |
+| position_error | 위치 오차 |
+| yaw_error | yaw 오차 |
+| pitch_error | pitch 오차 |
+| position_ok | 위치 판정 |
+| direction_ok | 방향 판정 |
+| time_ok | 시간 판정 |
+| missing | 누락 여부 |
+| success | 성공 여부 |
+| deduction | 목표별 감점 |
+
+`eval_result.csv`는 평가 전체의 요약을 위한 파일이고, `eval_detail.csv`는 target별 상세 판정과 감점을 확인하기 위한 파일이다. 두 파일의 목적은 서로 다르며, 같은 정보를 중복 저장하지 않도록 구분한다.
+
+### 31.96 JSON 직렬화 규칙
+
+- 모든 JSON 파일은 UTF-8로 저장한다.
+- JSON은 사람이 읽을 수 있도록 indentation을 적용한다.
+- 필드명은 데이터 모델과 동일하게 유지한다.
+- `None` 값은 JSON에서 `null`로 저장한다.
+- `bool` 값은 JSON에서 `true/false`로 저장한다.
+
+### 31.97 CSV 저장 규칙
+
+- 모든 CSV 파일은 UTF-8로 저장한다.
+- CSV는 헤더를 포함해야 한다.
+- CSV 컬럼 순서는 문서에 명시된 순서를 따른다.
+- `eval_result.csv`는 단일 행으로 저장한다.
+- `eval_detail.csv`는 target별로 한 행씩 저장한다.
+
+### 31.98 None 값 출력 규칙
+
+- `None` 값은 JSON에서는 `null`로 저장한다.
+- `None` 값은 CSV에서는 빈 문자열로 저장한다.
+- `matched_capture_timestamp`, `position_error`, `yaw_error`, `pitch_error`처럼 누락 target에서 비어 있는 필드는 빈 문자열 또는 `null`로 일관되게 표현해야 한다.
+
+### 31.99 bool 값 출력 규칙
+
+- `bool` 값은 JSON에서는 `true/false`로 저장한다.
+- `bool` 값은 CSV에서는 `true/false` 문자열로 저장한다.
+- `position_ok`, `direction_ok`, `time_ok`, `missing`, `success`는 출력 포맷 간 표현이 일치해야 한다.
+
+### 31.100 파일명 규칙
+
+- 기본 파일명은 `eval_result.json`, `eval_summary.json`, `eval_result.csv`, `eval_detail.csv`이다.
+- 사용자가 별도 파일명을 지정하지 않으면 기본 파일명을 사용한다.
+- 파일명은 출력 형식과 일치해야 하며 확장자를 바꾸지 않는다.
+
+### 31.101 저장 경로 규칙
+
+- 저장 경로는 사용자가 지정한 저장 폴더를 기준으로 한다.
+- 출력 디렉토리가 존재하지 않으면 저장 실패로 처리한다.
+- 저장 경로가 파일로 지정되었을 경우에도 저장 실패로 처리한다.
+- 경로 처리에는 `pathlib.Path` 기반 규칙을 사용한다.
+
+### 31.102 기존 파일 덮어쓰기 정책
+
+- 기존 파일이 있으면 덮어쓴다.
+- 덮어쓰기 여부를 사용자에게 추가 확인하지 않는다.
+- 덮어쓰기 자체는 오류가 아니며, 저장 성공의 한 형태로 본다.
+- 덮어쓰기 결과는 UI 메시지에서 필요 시 안내할 수 있다.
+
+### 31.103 저장 실패 처리
+
+- 저장 실패는 평가 결과를 폐기하지 않는다.
+- 일부 파일 저장이 실패하더라도 이미 생성된 결과 객체는 유지한다.
+- 저장 경로 없음, 권한 없음, 파일 쓰기 실패는 오류로 UI에 전달한다.
+- 저장 실패 결과에는 성공 파일 목록, 실패 파일 목록, 실패 원인을 포함할 수 있다.
+
+### 31.104 ReportExporter와 UI의 책임 분리
+
+- `ReportExporter`는 파일 생성과 저장만 수행하고 UI 위젯을 직접 호출하지 않는다.
+- UI는 `ReportExporter`의 결과를 받아 성공/실패 메시지만 표시한다.
+- `AppController`는 저장 요청을 중재하고 결과를 UI에 전달한다.
+- 저장 실패가 발생해도 UI는 이전 평가 결과 화면을 유지할 수 있어야 한다.
+
+### 31.105 리포트 저장 관련 테스트 기준
+
+- `tests/test_report_exporter.py`는 JSON/CSV 출력 구조와 컬럼 순서를 검증한다.
+- `tests/test_report_exporter.py`는 `None`과 `bool` 직렬화 규칙을 검증한다.
+- `tests/test_report_exporter.py`는 기본 파일명과 덮어쓰기 정책을 검증한다.
+- `tests/test_report_exporter.py`는 저장 실패 시 결과 유지와 오류 전달을 검증한다.
+- `tests/test_evaluator.py`와 `tests/test_score_calculator.py`는 저장 대상이 되는 `EvalResult`와 `ScoreDetail` 값이 올바르게 생성되는지 검증한다.
