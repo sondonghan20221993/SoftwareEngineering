@@ -2940,3 +2940,147 @@ final_score = max(0, 100 - total_deduction)
 - `tests/test_validator.py`는 파일 선택과 검증 오류 표시 흐름의 근거가 되는 입력 유효성을 검증한다.
 - `tests/test_matcher.py`와 `tests/test_score_calculator.py`는 상세 결과 탭과 시각화 탭이 사용하는 수치 결과를 검증한다.
 - UI 상태 전이 테스트는 `Idle`, `FilesSelected`, `Evaluating`, `Completed`, `Error` 상태에서 버튼 활성화 규칙이 일치하는지 확인해야 한다.
+
+## 테스트 설계 및 추적성 매트릭스
+
+### 31.122 테스트 설계 및 추적성 매트릭스의 목적
+
+이 섹션은 SRS 요구사항, SDD 설계 항목, STD 시험 항목, 테스트 파일을 서로 연결해 검증 근거를 추적 가능하게 만드는 것을 목적으로 한다. 단위 테스트, 통합 테스트, UI 수동 확인, 리포트 출력 검증, 성능 검증의 범위를 명확히 나누고, 각 테스트가 어떤 설계 항목을 검증하는지 문서 수준에서 고정한다.
+
+### 31.123 테스트 범위
+
+- 입력 파일 로드와 검증
+- 각도 계산과 매칭 알고리즘
+- 점수 계산과 결과 집계
+- 리포트 JSON/CSV 출력
+- UI 상태와 화면 표시의 수동 확인
+- 100MB 이하 입력의 성능 검증
+
+### 31.124 테스트 제외 범위
+
+- Python 코드 구현 상세
+- PyQt5 실제 위젯 구현 코드
+- AirSim 시뮬레이션 실행
+- 네트워크 기반 다중 사용자 기능
+- 이미지 품질 분석
+
+### 31.125 테스트 계층 구분
+
+| 계층 | 범위 | 목적 |
+|---|---|---|
+| 단위 테스트 | `tests/test_angle_utils.py`, `tests/test_score_calculator.py`, `tests/test_matcher.py` | 계산 규칙과 순수 로직을 검증한다. |
+| 통합 테스트 | `tests/test_evaluator.py`, `tests/test_file_loader.py`, `tests/test_validator.py` | 로드, 검증, 평가 흐름의 연결을 검증한다. |
+| UI 수동 확인 | UI 탭 동작, 버튼 상태, 메시지 표시 | 화면 상태와 사용자 흐름을 검증한다. |
+| 리포트 출력 검증 | `tests/test_report_exporter.py` | JSON/CSV 출력 구조와 저장 규칙을 검증한다. |
+| 성능 검증 | 평가 전체 흐름 | 100MB 이하 입력을 30초 이내 처리하는지 검증한다. |
+
+### 31.126 SRS-SDD-STD 추적성 표
+
+| 요구사항 ID 또는 요구사항 항목 | 관련 SDD 설계 섹션 | 관련 STD 시험 항목 | 관련 테스트 파일 | 검증 방법 | 합격 기준 |
+|---|---|---|---|---|---|
+| 위치/방향/시간 기준 평가 | 알고리즘 상세 설계 | 매칭 및 판정 시험 | `tests/test_matcher.py`, `tests/test_evaluator.py`, `tests/test_score_calculator.py` | 고정 데이터셋 비교 | 기대 판정과 점수가 일치한다. |
+| 입력 파일 로드 | 입력 파일 스키마 상세 설계 | 파일 로드 시험 | `tests/test_file_loader.py` | 정상/오류 파일 로드 | 정상 파일은 성공, 오류 파일은 실패한다. |
+| 입력 검증 | 오류 처리 매트릭스 | 검증 시험 | `tests/test_validator.py` | 구조/값 검증 | 오류가 적절히 분류된다. |
+| JSON/CSV 리포트 저장 | 리포트 저장 상세 설계 | 저장 출력 시험 | `tests/test_report_exporter.py` | 출력 파일 비교 | 스키마와 값이 일치한다. |
+| UI 상태 전이 | 평가 상태 전이도, UI 탭별 상세 설계 | UI 상태 확인 시험 | 수동 확인 | 버튼/탭 상태 확인 | 상태와 버튼이 일치한다. |
+| 성능 기준 | 알고리즘 상세 설계 | 성능 시험 | 통합 성능 검증 | 100MB 이하 입력 측정 | 30초 이내 완료한다. |
+
+### 31.127 설계 항목별 테스트 매핑 표
+
+| 설계 항목 | 검증 대상 | 관련 테스트 파일 | 검증 방법 | 합격 기준 |
+|---|---|---|---|---|
+| 각도 정규화 | normalize_angle_deg | `tests/test_angle_utils.py` | 179도와 -179도 차이 확인 | 최소 각도 차이가 2도이다. |
+| 위치 오차 계산 | position_error | `tests/test_evaluator.py`, `tests/test_matcher.py` | 좌표 차이 비교 | 수식 결과가 일치한다. |
+| pitch 오차 계산 | pitch_error | `tests/test_evaluator.py`, `tests/test_angle_utils.py` | 절대 차이 비교 | 수식 결과가 일치한다. |
+| 비용 행렬 생성 | cost_matrix | `tests/test_matcher.py` | 행렬 크기와 값 확인 | 모든 target-capture 조합이 반영된다. |
+| Hungarian algorithm 기반 1:1 매칭 | matched_pairs | `tests/test_matcher.py` | 고정 입력 매칭 비교 | 전역 최적 매칭이 일치한다. |
+| 목표 수보다 촬영 수가 적은 경우 | missing 처리 | `tests/test_evaluator.py` | 누락 target 수 확인 | 일부 target이 missing 된다. |
+| 목표 수보다 촬영 수가 많은 경우 | unused capture 처리 | `tests/test_evaluator.py` | 미사용 capture 확인 | unused capture는 감점되지 않는다. |
+| 누락 target 처리 | TargetResult None 필드 | `tests/test_evaluator.py` | None 필드 확인 | missing target의 필드가 None이다. |
+| 시간 초과 처리 | time_ok, timeout_deduction | `tests/test_score_calculator.py`, `tests/test_evaluator.py` | 시간 경계 비교 | 경계 초과 시 감점이 적용된다. |
+| 충돌 감점 처리 | collision_count, collision_deduction | `tests/test_score_calculator.py` | 충돌 수 집계 비교 | 충돌 수만큼 감점된다. |
+| 최종 점수 0점 하한 처리 | final_score | `tests/test_score_calculator.py` | 총 감점 100 초과 입력 | 최종 점수는 0점이다. |
+| JSON 입력 로드 | MissionConfig, Log records | `tests/test_file_loader.py` | JSON 로드 성공/실패 | 형식이 맞으면 로드된다. |
+| CSV 입력 로드 | CaptureRecord, CollisionRecord | `tests/test_file_loader.py` | CSV 로드 성공/실패 | 헤더와 필드가 맞으면 로드된다. |
+| collision 값 파싱 | collision bool | `tests/test_file_loader.py`, `tests/test_validator.py` | true/false, 1/0, yes/no 확인 | 허용 값만 해석된다. |
+| image_path 누락 처리 | image_path 검증 | `tests/test_validator.py` | 비어 있는 경로 확인 | 누락 경로는 오류로 보고된다. |
+| JSON 리포트 저장 | eval_result.json, eval_summary.json | `tests/test_report_exporter.py` | JSON 구조 비교 | 필드와 null/bool 규칙이 일치한다. |
+| CSV 리포트 저장 | eval_result.csv, eval_detail.csv | `tests/test_report_exporter.py` | CSV 헤더/행 비교 | 컬럼 순서와 값이 일치한다. |
+
+### 31.128 테스트 파일별 책임 표
+
+| 테스트 파일 | 책임 | 주요 검증 대상 |
+|---|---|---|
+| `tests/test_angle_utils.py` | 각도 계산 검증 | 각도 정규화, yaw/pitch 차이 |
+| `tests/test_score_calculator.py` | 감점과 점수 검증 | 감점 합계, final_score |
+| `tests/test_matcher.py` | 매칭과 비용 검증 | cost_matrix, Hungarian 매칭 |
+| `tests/test_evaluator.py` | 평가 통합 검증 | 판정, 누락, 평균 오차, 집계 |
+| `tests/test_file_loader.py` | 입력 로드 검증 | JSON/CSV 파싱, collision 값 |
+| `tests/test_validator.py` | 입력 검증 검증 | 필수 필드, NaN, 경로, 중복 |
+| `tests/test_report_exporter.py` | 출력 저장 검증 | JSON/CSV 리포트 구조 |
+
+### 31.129 정상 케이스 테스트 설계
+
+- 모든 target이 허용 오차 이내로 촬영된 경우를 검증한다.
+- 충돌이 없는 경우를 검증한다.
+- 모든 입력 파일이 정상 형식인 경우를 검증한다.
+- 리포트 4개 파일이 정상 저장되는 경우를 검증한다.
+
+정상 케이스의 합격 기준은 모든 결과 객체가 오류 없이 생성되고, 저장 파일의 구조와 값이 설계와 일치하는 것이다.
+
+### 31.130 경계 케이스 테스트 설계
+
+- yaw 179도와 -179도 차이를 검증한다.
+- `position_error == tolerance.position` 경계를 검증한다.
+- `yaw_error == tolerance.yaw` 경계를 검증한다.
+- `pitch_error == tolerance.pitch` 경계를 검증한다.
+- `capture.timestamp == time_limit` 경계를 검증한다.
+- 최종 점수가 0점이 되는 경우를 검증한다.
+- target 수와 capture 수가 다른 경우를 검증한다.
+
+경계 케이스의 합격 기준은 경계값에서 판정이 문서 규칙과 정확히 일치하는 것이다.
+
+### 31.131 오류 케이스 테스트 설계
+
+- mission_config.json 파일 없음
+- JSON 파싱 실패
+- CSV 헤더 누락
+- 필수 필드 누락
+- 숫자 변환 실패
+- NaN 또는 Infinity 입력
+- 중복 target_id
+- collision 값 해석 불가
+- image_path 파일 없음
+- 저장 경로 권한 없음
+
+오류 케이스의 합격 기준은 오류가 설계된 등급으로 분류되고, 평가 계속 여부와 UI 메시지가 오류 처리 매트릭스와 일치하는 것이다.
+
+### 31.132 회귀 테스트 기준
+
+- 계산식, 판정 규칙, 저장 구조, UI 상태 규칙이 바뀌면 관련 테스트를 모두 재실행한다.
+- `tests/test_angle_utils.py`, `tests/test_matcher.py`, `tests/test_score_calculator.py`, `tests/test_evaluator.py`, `tests/test_file_loader.py`, `tests/test_validator.py`, `tests/test_report_exporter.py`를 기본 회귀 집합으로 본다.
+- UI 관련 변경은 수동 확인 항목과 상태 전이 규칙을 다시 검증한다.
+- 성능 관련 변경은 동일 입력에서 30초 기준을 다시 확인한다.
+
+### 31.133 테스트 합격 기준
+
+- 기능별 테스트가 설계된 결과와 일치해야 한다.
+- 오류 케이스는 예상한 등급과 메시지로 분류되어야 한다.
+- 경계 케이스는 경계값에서 정확히 문서 규칙을 따른다.
+- 정상 케이스는 모든 결과 파일과 요약 값이 일치해야 한다.
+- 성능 검증은 100MB 이하 입력을 30초 이내 평가해야 한다.
+
+### 31.134 테스트 데이터 구성 원칙
+
+- 고정된 소규모 데이터셋을 사용해 기대 결과를 수작업으로 확인 가능해야 한다.
+- 정상, 경계, 오류 데이터를 분리해 관리한다.
+- JSON과 CSV 입력은 동일 의미의 데이터로 교차 검증할 수 있어야 한다.
+- 리포트 출력 검증용 데이터는 숫자, None, bool 값이 모두 포함되도록 구성한다.
+
+### 31.135 자동화 테스트 실행 기준
+
+- 단위 테스트는 계산 로직 변경 시 우선 실행한다.
+- 통합 테스트는 로드, 검증, 평가 흐름 변경 시 실행한다.
+- 리포트 출력 검증은 저장 구조나 직렬화 규칙 변경 시 실행한다.
+- UI 수동 확인은 탭 구성, 버튼 활성화, 메시지 변경 시 수행한다.
+- 성능 검증은 입력 크기 또는 매칭 알고리즘 변경 시 수행한다.
