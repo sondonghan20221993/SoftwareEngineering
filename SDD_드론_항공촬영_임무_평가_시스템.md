@@ -2470,3 +2470,154 @@ classDiagram
 - 평가 단계의 실패는 `eval_result`에 포함된 실패 상태와 상세 결과로 전달한다.
 - 저장 단계의 실패는 `export_result`에 포함된 성공/실패 파일 목록과 실패 원인으로 전달한다.
 - View는 이 결과 객체를 바탕으로 메시지와 화면 상태만 갱신하고, 로직 판정은 수행하지 않는다.
+
+## 알고리즘 상세 설계
+
+### 31.75 알고리즘 상세 설계의 목적
+
+이 섹션은 목표-촬영 매칭, 오차 계산, 판정, 감점, 최종 점수 산출의 계산 규칙을 설계 수준에서 고정하기 위한 것이다. 구현 코드는 아니며, `Matcher`, `Evaluator`, `ScoreCalculator`가 공통적으로 따라야 하는 수식과 절차를 명시한다.
+
+### 31.76 위치 오차 계산 설계
+
+위치 오차는 목표와 촬영 기록의 3차원 좌표 차이를 유클리드 거리로 계산한다.
+
+```text
+position_error = sqrt((target.x - capture.x)^2 + (target.y - capture.y)^2 + (target.z - capture.z)^2)
+```
+
+좌표 단위는 meter이며, 결과는 0 이상이어야 한다. 위치 오차는 매칭 후 판정과 감점 계산에 사용한다.
+
+### 31.77 yaw 오차 계산 설계
+
+yaw 오차는 각도 정규화 함수를 적용한 뒤 절대값으로 계산한다.
+
+```text
+yaw_error = abs(normalize_angle_deg(target_yaw - capture_yaw))
+```
+
+각도 단위는 degree이며, 정규화 결과는 `[-180, 180)` 범위를 전제로 한다.
+
+### 31.78 pitch 오차 계산 설계
+
+pitch 오차는 목표와 촬영 기록의 pitch 차이를 절대값으로 계산한다.
+
+```text
+pitch_error = abs(target_pitch - capture_pitch)
+```
+
+각도 단위는 degree이며, yaw와 달리 별도 정규화 없이 절대 차이만 사용한다.
+
+### 31.79 목표-촬영 비용 함수 설계
+
+목표와 촬영 기록의 비용은 위치 오차와 방향 오차를 가중합한 값이다.
+
+```text
+cost = position_error * position_weight + yaw_error * direction_weight + pitch_error * direction_weight
+```
+
+비용 함수는 허용 오차를 넘는 여부를 판정하지 않으며, 매칭 우선순위를 정하는 데만 사용한다.
+
+### 31.80 비용 행렬 생성 절차
+
+1. 유효한 목표 목록과 촬영 기록 목록을 준비한다.
+2. 각 target과 capture 조합에 대해 position_error, yaw_error, pitch_error를 계산한다.
+3. 각 조합의 cost를 계산해 행렬에 저장한다.
+4. 허용 위치 오차, 허용 방향 오차, 제한 시간 초과 여부는 행렬 생성에서 배제하지 않는다.
+5. 목표 수와 촬영 수가 다르더라도 직사각 행렬을 유지한다.
+
+### 31.81 Hungarian algorithm 기반 1:1 매칭 절차
+
+```text
+입력: targets, captures, weights
+출력: matched_pairs
+
+1. cost_matrix를 생성한다.
+2. Hungarian algorithm으로 cost 합이 최소가 되는 1:1 대응을 구한다.
+3. 반환된 대응을 target 인덱스와 capture 인덱스의 쌍으로 변환한다.
+4. 매칭되지 않은 target은 missing으로 처리할 후보가 된다.
+5. 매칭되지 않은 capture는 unused로 남기며 감점 대상이 아니다.
+```
+
+허용 위치 오차를 초과해도 매칭 후보에서 제외하지 않으며, 허용 방향 오차를 초과해도 매칭 후보에서 제외하지 않는다. 제한 시간을 초과해도 매칭 후보에서 제외하지 않고, 이 조건들은 모두 매칭 후 판정한다.
+
+### 31.82 매칭 후 판정 절차
+
+- `position_ok`는 `position_error <= tolerance.position`일 때 `true`이다.
+- `yaw_ok`는 `yaw_error <= tolerance.yaw`일 때 `true`이다.
+- `pitch_ok`는 `pitch_error <= tolerance.pitch`일 때 `true`이다.
+- `direction_ok`는 `yaw_ok and pitch_ok`이다.
+- `time_ok`는 `capture.timestamp <= target.time_limit`일 때 `true`이다.
+- `success`는 `position_ok and direction_ok and time_ok`이다.
+
+### 31.83 target 누락 처리 절차
+
+- 매칭된 capture가 없는 target은 missing으로 표시한다.
+- missing target의 `position_error`, `yaw_error`, `pitch_error`, `matched_capture_timestamp`는 `None`이다.
+- missing target의 `success`는 `false`이다.
+- missing target의 `timeout_deduction`은 `0`이다.
+- 목표 수보다 촬영 수가 적으면 일부 target은 missing 처리된다.
+
+### 31.84 충돌 집계 절차
+
+- collision_count는 `collision == true`로 해석된 충돌 레코드의 개수로 계산한다.
+- 충돌 로그는 평가 전 집계에 사용되며, 매칭 결과와 별도로 관리한다.
+- collision_count는 감점 계산에서만 사용하고, 매칭 후보 선택에는 사용하지 않는다.
+
+### 31.85 감점 계산 절차
+
+```text
+position_deduction = max(0, position_error - tolerance.position) * deduction_policy.position
+yaw_deduction = max(0, yaw_error - tolerance.yaw) * deduction_policy.yaw
+pitch_deduction = max(0, pitch_error - tolerance.pitch) * deduction_policy.pitch
+
+if time_ok is false and missing is false:
+  timeout_deduction = deduction_policy.timeout
+else:
+  timeout_deduction = 0
+
+if missing is true:
+  missing_deduction = deduction_policy.missing
+else:
+  missing_deduction = 0
+
+collision_deduction = collision_count * deduction_policy.collision
+
+total_deduction = position_deduction + yaw_deduction + pitch_deduction + timeout_deduction + missing_deduction + collision_deduction
+```
+
+목표 수보다 촬영 수가 많으면 unused capture가 남을 수 있으나, unused capture는 감점 대상이 아니다.
+
+### 31.86 최종 점수 계산 절차
+
+```text
+final_score = max(0, 100 - total_deduction)
+```
+
+최종 점수는 0 미만으로 내려가지 않으며, total_deduction가 100을 넘으면 0점으로 제한한다.
+
+### 31.87 평균 오차 계산 절차
+
+- 평균 오차는 missing이 아닌 target 중 매칭된 capture가 있는 항목만 대상으로 계산한다.
+- 평균 position_error는 유효한 position_error의 산술평균이다.
+- 평균 yaw_error는 유효한 yaw_error의 산술평균이다.
+- 평균 pitch_error는 유효한 pitch_error의 산술평균이다.
+- 계산 가능한 항목이 없으면 평균값은 `None`이다.
+
+### 31.88 알고리즘 경계 조건
+
+- 대상 capture가 0건이면 모든 target은 missing으로 처리한다.
+- target이 0건인 입력은 스키마 검증 실패로 본다.
+- 위치 오차가 허용 경계와 정확히 같으면 `position_ok`는 `true`이다.
+- yaw 오차와 pitch 오차가 허용 경계와 정확히 같으면 방향 판정은 통과한다.
+- 제한 시간 경계와 정확히 같으면 `time_ok`는 `true`이다.
+- missing target에는 시간 초과 감점을 적용하지 않는다.
+- unused capture는 결과 집계에 포함하지 않는다.
+
+### 31.89 알고리즘 관련 테스트 기준
+
+- `tests/test_angle_utils.py`는 각도 정규화와 yaw/pitch 오차 계산을 검증한다.
+- `tests/test_matcher.py`는 비용 행렬 생성과 Hungarian 기반 1:1 매칭을 검증한다.
+- `tests/test_evaluator.py`는 매칭 후 판정, missing 처리, 평균 오차 집계를 검증한다.
+- `tests/test_score_calculator.py`는 감점 계산, total_deduction, final_score 계산을 검증한다.
+- 경계값 테스트는 허용 오차와 제한 시간이 정확히 같은 입력을 포함해야 한다.
+- 매칭 불일치 테스트는 목표 수와 촬영 수가 다른 경우의 missing과 unused capture 처리를 확인해야 한다.
