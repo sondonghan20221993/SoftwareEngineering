@@ -1619,3 +1619,100 @@ AppController
 - 사용자가 처음부터 모든 파일을 다시 선택할 필요가 없도록 해야 한다.
 - 수정된 항목만 다시 선택해도 재검증 가능해야 한다.
 - 이전 평가 결과는 새 평가가 완료되기 전까지 유지하는 것이 바람직하다.
+
+## 전체 시스템 Data Flow Diagram
+
+### 31.3 Data Flow Diagram의 목적
+
+이 다이어그램은 임무 설정과 로그 입력이 파일 로드, 검증, 매칭, 점수 계산, 결과 표시, 리포트 저장으로 이어지는 전체 데이터 흐름을 한눈에 보여주기 위한 것이다. 또한 UI가 평가 로직을 직접 수행하지 않고, 평가 결과를 소비하는 역할에 머물러야 한다는 분리 원칙을 명시한다.
+
+### 31.4 Mermaid flowchart
+
+```mermaid
+flowchart LR
+  MissionConfigJSON[Mission Config JSON]
+  CaptureLogCSV[Capture Log CSV]
+  CollisionLogCSV[Collision Log CSV]
+  FileLoader[FileLoader]
+  Validator[Validator]
+  ValidationErrorList[Validation Error List]
+  Evaluator[Evaluator]
+  Matcher[Matcher]
+  ScoreCalculator[ScoreCalculator]
+  EvalResult[EvalResult]
+  UIResultView[UI Result View]
+  ReportExporter[ReportExporter]
+  EvalResultJSON[eval_result.json]
+  EvalResultCSV[eval_result.csv]
+  EvalDetailCSV[eval_detail.csv]
+  EvalSummaryJSON[eval_summary.json]
+
+  MissionConfigJSON --> FileLoader
+  CaptureLogCSV --> FileLoader
+  CollisionLogCSV --> FileLoader
+
+  FileLoader --> Validator
+  Validator -->|검증 성공| Evaluator
+  Validator -->|검증 실패| ValidationErrorList
+
+  Evaluator --> Matcher
+  Matcher --> Evaluator
+  Evaluator --> ScoreCalculator
+  ScoreCalculator --> Evaluator
+  Evaluator --> EvalResult
+
+  EvalResult --> UIResultView
+  EvalResult --> ReportExporter
+
+  ReportExporter --> EvalResultJSON
+  ReportExporter --> EvalResultCSV
+  ReportExporter --> EvalDetailCSV
+  ReportExporter --> EvalSummaryJSON
+
+  ValidationErrorList --> UIResultView
+```
+
+### 31.5 노드 설명
+
+| 노드 | 입력 | 출력 | 역할 |
+|---|---|---|---|
+| Mission Config JSON | 임무 설정 JSON 파일 | 원본 JSON 텍스트 | 목표, 허용 오차, 가중치, 감점 정책의 원천 데이터이다. |
+| Capture Log CSV | 촬영 로그 CSV 파일 | 원본 CSV 레코드 | 촬영 시각, 위치, 방향, 이미지 경로를 제공한다. |
+| Collision Log CSV | 충돌 로그 CSV 파일 | 원본 CSV 레코드 | 충돌 발생 여부와 위치 정보를 제공한다. |
+| FileLoader | 입력 파일 경로 또는 원본 파일 | 모델 객체 목록 | 파일 내용을 파싱하여 `MissionConfig`, 로그 레코드로 변환한다. |
+| Validator | 모델 객체 | Validation Error List 또는 통과 신호 | 필수 필드, 값 범위, 경로, 형식 규칙을 검사한다. |
+| Validation Error List | 검증 실패 정보 | UI 표시용 오류 목록 | 검증 실패 사유를 사용자에게 전달한다. |
+| Evaluator | 검증 완료 모델 객체 | `EvalResult` 생성 요청 | 전체 평가 흐름을 조율하고 최종 결과를 구성한다. |
+| Matcher | 목표 목록, 촬영 목록, 평가 기준 | 매칭 결과 | 목표와 촬영 기록의 1:1 매칭을 계산한다. |
+| ScoreCalculator | 매칭 결과, 감점 정책 | 감점 합계와 최종 점수 | 목표별 감점과 총점을 계산한다. |
+| EvalResult | 평가 요약과 상세 결과 | UI/저장용 구조화 결과 | 화면 표시와 파일 저장에 공통으로 사용되는 결과 객체이다. |
+| UI Result View | `EvalResult`, 오류 목록 | 화면 표시 상태 | 결과 요약, 상세 결과, 오류 메시지를 표시한다. |
+| ReportExporter | `EvalResult`, 저장 경로 | 출력 파일 | 결과를 JSON/CSV 파일로 저장한다. |
+| eval_result.json | `EvalResult` 요약 | JSON 파일 | 전체 평가 요약을 구조화된 JSON으로 저장한다. |
+| eval_result.csv | `EvalResult` 요약 | CSV 파일 | 요약 정보를 단일 행 CSV로 저장한다. |
+| eval_detail.csv | 목표별 상세 결과 | CSV 파일 | 목표별 판정과 감점을 행 단위로 저장한다. |
+| eval_summary.json | 집계 정보 | JSON 파일 | UI 요약 화면에 필요한 핵심 집계만 저장한다. |
+
+### 31.6 단계별 데이터 흐름
+
+1. 사용자는 임무 설정 JSON, 촬영 로그 CSV, 충돌 로그 CSV를 입력한다.
+2. `FileLoader`는 각 파일을 읽고 문서에 정의된 모델 객체로 변환한다.
+3. `Validator`는 구조, 필수 필드, 수치 범위, 경로 유효성을 검사한다.
+4. 검증이 통과하면 `Evaluator`가 `Matcher`와 `ScoreCalculator`를 호출해 `EvalResult`를 생성한다.
+5. `UI Result View`는 `EvalResult`를 받아 화면에 요약과 상세 결과를 표시한다.
+6. `ReportExporter`는 동일한 `EvalResult`를 사용해 `eval_result.json`, `eval_result.csv`, `eval_detail.csv`, `eval_summary.json`을 저장한다.
+
+### 31.7 오류 흐름
+
+- `Validator`에서 구조 오류, 필수 필드 누락, 값 범위 위반, 경로 오류가 발생하면 평가를 중단하고 `Validation Error List`만 UI에 전달한다.
+- 숫자 변환 실패, NaN 포함, 레코드 단위 필드 누락처럼 개별 레코드에 국한되는 문제는 해당 레코드를 제외하는 방향으로 처리하되, 전체 데이터 로드가 실패하지 않으면 평가를 계속할 수 있다.
+- 파일 전체 파싱 실패, 지원하지 않는 형식, 읽기 불가 상태처럼 입력 자체가 무효한 경우에는 평가를 중단한다.
+- 이미지 파일 누락은 평가 중단 사유가 아니라 결과 표시 시 경고 정보로만 반영한다.
+
+### 31.8 설계상 분리 원칙
+
+- `FileLoader`는 읽기와 객체 생성만 담당하고, 검증이나 점수 계산을 수행하지 않는다.
+- `Validator`는 판정 결과만 반환하고, UI 갱신이나 파일 저장을 직접 수행하지 않는다.
+- `Evaluator`는 전체 흐름을 조율하되, 매칭과 점수 계산의 세부 규칙은 `Matcher`와 `ScoreCalculator`로 분리한다.
+- `UI Result View`는 결과를 표시만 하고, 평가 알고리즘이나 저장 형식에 의존하지 않는다.
+- `ReportExporter`는 출력 파일 생성을 전담하고, 화면 갱신과는 분리된다.
