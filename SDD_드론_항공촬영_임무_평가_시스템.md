@@ -3084,3 +3084,177 @@ final_score = max(0, 100 - total_deduction)
 - 리포트 출력 검증은 저장 구조나 직렬화 규칙 변경 시 실행한다.
 - UI 수동 확인은 탭 구성, 버튼 활성화, 메시지 변경 시 수행한다.
 - 성능 검증은 입력 크기 또는 매칭 알고리즘 변경 시 수행한다.
+
+## 실행 시나리오 상세 설계
+
+### 31.136 실행 시나리오 상세 설계의 목적
+
+이 섹션은 시스템이 실제로 어떤 순서와 상태로 동작해야 하는지 정상, 경계, 오류 관점에서 구체화하기 위한 것이다. 각 시나리오는 설계 검증 기준을 제공하며, 관련 모듈과 테스트 항목을 함께 연결해 추적 가능하게 한다.
+
+### 31.137 시나리오 작성 기준
+
+- 각 시나리오는 목적, 사전 조건, 입력 데이터 조건, 처리 흐름, 기대 상태 전이, 기대 결과, 오류/경고 표시, 관련 모듈, 관련 테스트 항목을 포함한다.
+- 시나리오는 실제 구현 코드가 아니라 설계 수준의 검증 기준으로 작성한다.
+- 정상, 누락, 오류, 저장 실패, 중복 실행 상황을 서로 구분해 기술한다.
+- 평가 결과와 UI 상태는 분리해서 설명하되, 상태 전이는 Controller 기준으로 명시한다.
+
+### 31.138 정상 평가 시나리오
+
+- 목적: 모든 입력이 정상일 때 평가와 저장이 끝까지 성공하는지 확인한다.
+- 사전 조건: 모든 파일이 선택되어 있고 파일 형식이 올바르다.
+- 입력 데이터 조건: 모든 target이 capture와 매칭되고, 위치/방향/시간 조건이 모두 만족되며 충돌이 없다.
+- 처리 흐름: 파일 로드 -> 검증 -> 매칭 -> 감점 계산 -> 결과 표시 -> 리포트 저장 순으로 진행한다.
+- 기대 상태 전이: `Idle -> FilesSelected -> Loading -> Validating -> ReadyToEvaluate -> Evaluating -> Completed -> Exporting -> Completed`.
+- 기대 결과: `final_score`는 100점이고 리포트 4개 파일 저장이 가능하다.
+- 오류/경고 표시: 오류 없음, 저장 성공 메시지만 표시한다.
+- 관련 모듈: `FileLoader`, `Validator`, `Evaluator`, `Matcher`, `ScoreCalculator`, `ReportExporter`, `AppController`, View.
+- 관련 테스트 항목: 정상 케이스 테스트, JSON 입력 로드, CSV 입력 로드, JSON/CSV 리포트 저장.
+
+### 31.139 일부 촬영 누락 시나리오
+
+- 목적: target 수가 capture 수보다 많을 때 누락 처리가 올바른지 확인한다.
+- 사전 조건: 입력 파일은 정상이며 일부 target에 대응되는 capture가 없다.
+- 입력 데이터 조건: target 수가 capture 수보다 많고 일부 target은 매칭되지 않는다.
+- 처리 흐름: 평가는 계속 진행되고 매칭되지 않은 target은 missing으로 표시된다.
+- 기대 상태 전이: `Evaluating -> Completed`.
+- 기대 결과: missing target의 오차와 `matched_capture_timestamp`는 `None`이며 missing 감점이 적용된다.
+- 오류/경고 표시: 누락된 target이 있음을 요약 또는 상세 결과에 표시한다.
+- 관련 모듈: `Matcher`, `Evaluator`, `ScoreCalculator`, `AppController`, View.
+- 관련 테스트 항목: 목표 수보다 촬영 수가 적은 경우, 누락 target 처리, 설계 항목별 테스트 매핑.
+
+### 31.140 촬영 로그가 비어 있는 시나리오
+
+- 목적: capture record가 0개일 때 평가가 어떤 결과를 만드는지 확인한다.
+- 사전 조건: mission 설정은 정상이고 capture 로그만 비어 있다.
+- 입력 데이터 조건: capture record가 0개이며 target은 1개 이상이다.
+- 처리 흐름: 로드는 성공하되 매칭 결과는 없고 모든 target은 missing으로 처리된다.
+- 기대 상태 전이: `Validating -> ReadyToEvaluate -> Evaluating -> Completed`.
+- 기대 결과: 평가 결과는 생성 가능하나 `final_score`는 감점 결과에 따라 계산된다.
+- 오류/경고 표시: 유효한 촬영 로그가 없다는 안내 또는 경고를 표시한다.
+- 관련 모듈: `FileLoader`, `Validator`, `Matcher`, `Evaluator`, `ScoreCalculator`.
+- 관련 테스트 항목: 빈 capture 로그 테스트, 누락 target 처리, 평균 오차 계산.
+
+### 31.141 목표 수보다 촬영 수가 많은 시나리오
+
+- 목적: unused capture가 결과와 감점에 영향을 주지 않는지 확인한다.
+- 사전 조건: target보다 capture가 많다.
+- 입력 데이터 조건: 일부 capture는 매칭되지 않는다.
+- 처리 흐름: target별 최적 매칭만 결과에 반영하고 남는 capture는 unused로 둔다.
+- 기대 상태 전이: `Evaluating -> Completed`.
+- 기대 결과: unused capture는 감점 대상이 아니며 결과 집계에 포함되지 않는다.
+- 오류/경고 표시: 필요 시 일부 촬영 미사용 안내를 표시한다.
+- 관련 모듈: `Matcher`, `Evaluator`, `ScoreCalculator`.
+- 관련 테스트 항목: 목표 수보다 촬영 수가 많은 경우, unused capture 처리.
+
+### 31.142 충돌 발생 시나리오
+
+- 목적: collision 로그가 전체 감점에 반영되는지 확인한다.
+- 사전 조건: 충돌 로그에 `collision=true`로 해석되는 레코드가 존재한다.
+- 입력 데이터 조건: collision_count가 1 이상이다.
+- 처리 흐름: 충돌 수를 집계하고 collision 감점을 계산한다.
+- 기대 상태 전이: `Evaluating -> Completed`.
+- 기대 결과: collision_count가 증가하고 전체 감점에 반영된다.
+- 오류/경고 표시: 충돌 발생을 결과 요약 또는 상세 정보로 표시한다.
+- 관련 모듈: `FileLoader`, `Validator`, `Evaluator`, `ScoreCalculator`.
+- 관련 테스트 항목: 충돌 감점 처리, collision 값 파싱.
+
+### 31.143 시간 초과 발생 시나리오
+
+- 목적: 제한 시간 초과가 성공 판정과 감점에 반영되는지 확인한다.
+- 사전 조건: capture가 target에 매칭되지만 timestamp가 time_limit보다 크다.
+- 입력 데이터 조건: `capture.timestamp > target.time_limit`이다.
+- 처리 흐름: 매칭 후 time_ok를 false로 판정하고 timeout 감점을 적용한다.
+- 기대 상태 전이: `Evaluating -> Completed`.
+- 기대 결과: `time_ok=false`, `success=false`, missing이 아니면 timeout 감점이 적용된다.
+- 오류/경고 표시: 시간 초과를 상세 결과에서 표시한다.
+- 관련 모듈: `Evaluator`, `ScoreCalculator`, `Matcher`.
+- 관련 테스트 항목: 시간 초과 처리, 경계 케이스 테스트.
+
+### 31.144 이미지 파일 누락 시나리오
+
+- 목적: image_path가 존재하지만 실제 파일이 없을 때의 처리 흐름을 확인한다.
+- 사전 조건: 경로 문자열은 유효하지만 파일 시스템에 대상 파일이 없다.
+- 입력 데이터 조건: `image_path`는 비어 있지 않으나 파일이 존재하지 않는다.
+- 처리 흐름: 평가는 계속하고 UI 미리보기는 이미지 없음 상태로 표시한다.
+- 기대 상태 전이: `Evaluating -> Completed`.
+- 기대 결과: 이미지 누락은 경고로 처리되고 평가는 중단되지 않는다.
+- 오류/경고 표시: Warning으로 표시한다.
+- 관련 모듈: `Validator`, `Evaluator`, View.
+- 관련 테스트 항목: image_path 누락 처리, 이미지 경로 존재성 테스트.
+
+### 31.145 mission_config.json 오류 시나리오
+
+- 목적: 임무 설정 파일 형식 오류가 즉시 중단되는지 확인한다.
+- 사전 조건: mission 설정 파일이 선택되었지만 파싱 또는 구조가 잘못되었다.
+- 입력 데이터 조건: JSON 파싱 실패 또는 필수 필드 누락이 있다.
+- 처리 흐름: 로드 또는 검증에서 실패하고 평가는 실행되지 않는다.
+- 기대 상태 전이: `Loading -> Error` 또는 `Validating -> Error`.
+- 기대 결과: 오류 등급은 Fatal이며 평가는 실행되지 않는다.
+- 오류/경고 표시: 임무 설정 파일 형식 오류 메시지를 표시한다.
+- 관련 모듈: `FileLoader`, `Validator`, `AppController`, View.
+- 관련 테스트 항목: mission_config 로드 실패, mission_config 검증 테스트.
+
+### 31.146 capture_log.csv 일부 행 오류 시나리오
+
+- 목적: 일부 row만 잘못된 경우 나머지 valid capture로 평가가 계속되는지 확인한다.
+- 사전 조건: capture 로그는 일부 행만 잘못되었다.
+- 입력 데이터 조건: 일부 row의 숫자 변환이 실패한다.
+- 처리 흐름: 해당 row는 제외하고 남은 valid capture로 평가를 진행한다.
+- 기대 상태 전이: `Validating -> ReadyToEvaluate -> Evaluating -> Completed`.
+- 기대 결과: Recoverable 오류로 기록되고 전체 평가는 계속된다.
+- 오류/경고 표시: 제외된 row와 원인을 표시한다.
+- 관련 모듈: `FileLoader`, `Validator`, `Evaluator`.
+- 관련 테스트 항목: 숫자 변환 실패, NaN 또는 Infinity 입력, capture_log 검증 테스트.
+
+### 31.147 collision_log.csv 값 오류 시나리오
+
+- 목적: collision 값이 허용 집합 밖일 때 row 처리와 오류 분류를 확인한다.
+- 사전 조건: collision 로그에 값이 잘못된 row가 있다.
+- 입력 데이터 조건: collision 값이 true, false, 1, 0, yes, no 중 하나가 아니다.
+- 처리 흐름: 해당 row는 제외 가능하며 Recoverable로 기록한다.
+- 기대 상태 전이: `Validating -> ReadyToEvaluate` 또는 `Validating -> Error`가 아니라 부분 제외 후 계속 가능해야 한다.
+- 기대 결과: 유효한 collision row만 집계한다.
+- 오류/경고 표시: 잘못된 collision 값을 오류 목록에 표시한다.
+- 관련 모듈: `FileLoader`, `Validator`, `Evaluator`.
+- 관련 테스트 항목: collision 값 파싱, collision 로그 검증 테스트.
+
+### 31.148 리포트 저장 실패 시나리오
+
+- 목적: 저장 실패가 평가 결과를 폐기하지 않는지 확인한다.
+- 사전 조건: `Completed` 상태에서 저장을 시도한다.
+- 입력 데이터 조건: 저장 경로가 없거나 권한이 없다.
+- 처리 흐름: 저장은 실패하지만 `EvalResult`는 유지한다.
+- 기대 상태 전이: `Completed -> Exporting -> Error`.
+- 기대 결과: 저장 실패 메시지를 UI에 표시하고 결과 데이터는 유지한다.
+- 오류/경고 표시: 저장 실패 원인과 실패 파일 목록을 표시한다.
+- 관련 모듈: `ReportExporter`, `AppController`, View.
+- 관련 테스트 항목: 저장 경로 오류 테스트, 저장 권한 오류 테스트, 저장 실패 시 결과 유지와 오류 전달.
+
+### 31.149 UI 중복 실행 요청 시나리오
+
+- 목적: Evaluating 상태에서 중복 실행이 차단되는지 확인한다.
+- 사전 조건: 평가가 이미 진행 중이다.
+- 입력 데이터 조건: 사용자가 평가 실행 버튼을 다시 누른다.
+- 처리 흐름: 버튼 비활성화로 중복 실행을 차단한다.
+- 기대 상태 전이: 상태 변화 없음, `Evaluating` 유지.
+- 기대 결과: 평가 상태와 결과가 중복 생성되지 않는다.
+- 오류/경고 표시: 평가 진행 중이라는 안내를 표시한다.
+- 관련 모듈: View, `AppController`.
+- 관련 테스트 항목: UI 상태 전이 테스트, 중복 실행 방지 테스트.
+
+### 31.150 시나리오와 테스트 항목 연결 표
+
+| 시나리오 | 관련 테스트 항목 | 검증 포인트 |
+|---|---|---|
+| 정상 평가 시나리오 | 정상 케이스 테스트, 리포트 출력 검증 | 전체 흐름과 저장 결과 |
+| 일부 촬영 누락 시나리오 | missing 처리 테스트 | 누락 target과 감점 |
+| 촬영 로그가 비어 있는 시나리오 | 빈 capture 로그 테스트 | 전 target missing 처리 |
+| 목표 수보다 촬영 수가 많은 시나리오 | unused capture 처리 테스트 | 미사용 capture 비감점 |
+| 충돌 발생 시나리오 | 충돌 감점 처리 테스트 | collision_count와 감점 |
+| 시간 초과 발생 시나리오 | 시간 초과 처리 테스트 | time_ok와 timeout 감점 |
+| 이미지 파일 누락 시나리오 | image_path 검증 테스트 | Warning 처리와 미리보기 |
+| mission_config.json 오류 시나리오 | mission_config 로드/검증 테스트 | Fatal 중단 |
+| capture_log.csv 일부 행 오류 시나리오 | capture_log 검증 테스트 | Recoverable 제외 처리 |
+| collision_log.csv 값 오류 시나리오 | collision 값 파싱 테스트 | Recoverable 제외 처리 |
+| 리포트 저장 실패 시나리오 | 저장 실패 테스트 | 결과 유지와 Error 상태 |
+| UI 중복 실행 요청 시나리오 | UI 상태 전이 테스트 | 중복 실행 차단 |
