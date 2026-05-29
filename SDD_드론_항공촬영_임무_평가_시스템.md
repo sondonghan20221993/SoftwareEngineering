@@ -4633,3 +4633,197 @@ UI는 사용자 절차와 상태 전이를 직접 보여주므로, 탭 이름과
 - 수정 후에는 이 섹션의 점검표를 다시 확인해 재검토한다.
 
 이 원칙은 문서를 한 번에 끝내는 것이 아니라, 수정 후에도 다시 같은 기준으로 확인하도록 만드는 반복 점검 기준이다.
+
+## 부록: 설계 산출물 목록 및 문서 색인
+
+### 31.267 부록의 목적
+
+이 부록은 본 SDD에 포함된 주요 설계 산출물과 색인 항목을 한곳에 모아, 구현자와 검토자가 필요한 섹션으로 빠르게 이동할 수 있도록 돕기 위한 것이다. 새로운 설계 규칙을 추가하는 것이 아니라, 이미 작성된 내용을 찾기 쉽게 정리하는 데 목적이 있다.
+
+### 31.268 설계 산출물 목록 표
+
+| 항목 | 문서 내 위치 또는 섹션명 | 목적 | 관련 구현 모듈 | 관련 테스트 항목 |
+|---|---|---|---|---|
+| 시스템 개요 | 시스템 개요 | 시스템 범위와 목적을 요약한다. | AppController, View, Service, Model | 전체 흐름 시험 |
+| 전체 시스템 Data Flow Diagram | 전체 시스템 Data Flow Diagram | 입력, 처리, 출력의 흐름을 보여준다. | FileLoader, Validator, Matcher, Evaluator, ReportExporter | 데이터 흐름 시험 |
+| 평가 실행 Sequence Diagram | 평가 실행 Sequence Diagram | 평가 호출 순서와 상호작용을 보여준다. | AppController, Evaluator, ReportExporter | 실행 순서 시험 |
+| 평가 상태 전이도 | 평가 상태 전이도 | 상태 변화와 전이 조건을 보여준다. | AppController, View | 상태 전이 시험 |
+| 모듈 의존성 다이어그램 | 모듈 의존성 다이어그램 | 모듈 간 연결 관계를 보여준다. | FileLoader, Validator, Matcher, Evaluator, ScoreCalculator, ReportExporter | 모듈 의존성 시험 |
+| 데이터 모델 관계도 | 데이터 모델 관계도 | 데이터 구조 간 관계를 보여준다. | MissionConfig, CaptureRecord, CollisionRecord, TargetResult, ScoreDetail, EvalResult | 모델 관계 시험 |
+| 입력 파일 스키마 상세 설계 | 입력 파일 스키마 상세 설계 | 입력 파일 구조와 필드를 정의한다. | FileLoader, Validator | 입력 파싱 시험 |
+| 오류 처리 매트릭스 | 오류 처리 매트릭스 | 오류 등급과 처리 기준을 정리한다. | FileLoader, Validator, AppController, View | 오류 처리 시험 |
+| 모듈별 Public Method 명세 | 모듈별 Public Method 명세 | 각 모듈의 공개 책임을 정리한다. | AppController, FileLoader, Validator, Matcher, Evaluator, ScoreCalculator, ReportExporter, View | 인터페이스 시험 |
+| 알고리즘 상세 설계 | 알고리즘 상세 설계 | 매칭, 오차, 감점 계산 기준을 정의한다. | Matcher, Evaluator, ScoreCalculator, angle_utils | 알고리즘 시험 |
+| 리포트 저장 상세 설계 | 리포트 저장 상세 설계 | 리포트 파일 생성과 저장 규칙을 정의한다. | ReportExporter | 저장 시험 |
+| UI 탭별 상세 설계 | UI 탭별 상세 설계 | 탭별 화면 구성과 동작을 정리한다. | View, AppController | UI 동작 시험 |
+| 테스트 설계 및 추적성 매트릭스 | 테스트 설계 및 추적성 매트릭스 | 요구사항과 테스트 연결을 정의한다. | tests, STD | 추적성 시험 |
+| 실행 시나리오 상세 설계 | 실행 시나리오 상세 설계 | 정상, 오류, 재평가 흐름을 설명한다. | AppController, View | 시나리오 시험 |
+| 성능 및 확장성 설계 | 성능 및 확장성 설계 | 입력 크기와 처리 시간 기준을 정리한다. | FileLoader, Evaluator, ScoreCalculator, View | 성능 시험 |
+| 보안 및 안정성 설계 | 보안 및 안정성 설계 | 입력 안전성과 오류 안정성을 정의한다. | FileLoader, Validator, AppController, View | 보안 및 안정성 시험 |
+| 설계 결정 기록 | 설계 결정 기록 | 주요 설계 선택의 근거를 남긴다. | 전체 모듈 | 설계 검토 시험 |
+| 미확정 사항 및 변경 관리 설계 | 미확정 사항 및 변경 관리 설계 | 변경 후보와 확정 기준을 관리한다. | 전체 모듈 | 변경 관리 시험 |
+| 용어 및 데이터 사전 | 용어 및 데이터 사전 | 용어, 필드, 상태를 고정한다. | 전체 데이터 모델, View, ReportExporter | 용어 일치 시험 |
+| 요구사항-설계 상세 추적성 | 요구사항-설계 상세 추적성 | 요구사항과 설계를 1차 추적한다. | 전체 모듈 | 추적성 시험 |
+| 운영 절차 및 사용자 작업 흐름 | 운영 절차 및 사용자 작업 흐름 | 사용자 행동과 상태 흐름을 연결한다. | AppController, View, Service | 사용자 흐름 시험 |
+| 구현 준비 체크리스트 및 완료 기준 | 구현 준비 체크리스트 및 완료 기준 | 구현 착수와 완료 조건을 확인한다. | 전체 모듈 | 구현 준비 시험 |
+| 문서 검토 기준 및 품질 점검표 | 문서 검토 기준 및 품질 점검표 | 문서 정합성과 품질을 검토한다. | 전체 문서 | 문서 검토 시험 |
+
+이 표는 본 문서에서 실제 구현과 검토에 직접 연결되는 핵심 산출물을 찾는 목차 역할을 한다. 항목명과 섹션명이 같지 않더라도 문서 내 위치를 기준으로 추적한다.
+
+### 31.269 다이어그램 목록 표
+
+| 항목 | 문서 내 위치 또는 섹션명 | 목적 | 관련 구현 모듈 | 관련 테스트 항목 |
+|---|---|---|---|---|
+| Data Flow Diagram | 전체 시스템 Data Flow Diagram | 데이터 입력부터 결과 저장까지의 경로를 보여준다. | FileLoader, Validator, Matcher, Evaluator, ReportExporter | 데이터 흐름 시험 |
+| Sequence Diagram | 평가 실행 Sequence Diagram | 평가 실행 순서를 보여준다. | AppController, Evaluator, ReportExporter | 실행 순서 시험 |
+| State Diagram | 평가 상태 전이도 | 상태 전이와 중간 상태를 보여준다. | AppController, View | 상태 전이 시험 |
+| Module Dependency Diagram | 모듈 의존성 다이어그램 | 모듈 의존 관계를 보여준다. | 전체 서비스 모듈 | 의존성 시험 |
+| Data Model Class Diagram | 데이터 모델 관계도 | 클래스와 데이터 구조 관계를 보여준다. | MissionConfig, CaptureRecord, CollisionRecord, TargetResult, ScoreDetail, EvalResult | 모델 관계 시험 |
+
+이 표는 문서에 포함된 다이어그램을 별도로 모아, 설계 흐름과 데이터 흐름을 빠르게 확인할 수 있도록 한다. 다이어그램은 텍스트 표의 보조가 아니라 설계 구조를 이해하는 핵심 자료이다.
+
+### 31.270 표 목록 요약
+
+- 설계 산출물 목록 표는 문서 전체의 핵심 설계 섹션을 연결한다.
+- 다이어그램 목록 표는 구조와 흐름을 빠르게 찾기 위한 색인 역할을 한다.
+- 알고리즘, 데이터 모델, 입력/출력, 서비스, UI, 테스트, 오류, 상태 관련 표는 본문과 부록에서 함께 추적된다.
+- 구현 준비, 검토 기준, 추적성 표는 문서 품질과 구현 기준을 연결한다.
+
+이 요약은 표가 많아도 실제 활용 관점에서는 몇 개의 축으로 묶어 볼 수 있음을 보여준다. 색인은 분산된 내용을 재구성하기 위한 보조 장치이다.
+
+### 31.271 알고리즘 및 수식 목록
+
+| 항목 | 문서 내 위치 또는 섹션명 | 목적 | 관련 구현 모듈 | 관련 테스트 항목 |
+|---|---|---|---|---|
+| position_error 계산식 | 알고리즘 상세 설계 | 위치 오차를 계산한다. | Evaluator, ScoreCalculator | 위치 오차 계산 시험 |
+| yaw_error 계산식 | 알고리즘 상세 설계 | yaw 오차를 계산한다. | Evaluator, ScoreCalculator | yaw 오차 계산 시험 |
+| pitch_error 계산식 | 알고리즘 상세 설계 | pitch 오차를 계산한다. | Evaluator, ScoreCalculator | pitch 오차 계산 시험 |
+| matching cost 계산식 | 알고리즘 상세 설계 | target과 capture의 매칭 비용을 계산한다. | Matcher | 매칭 시험 |
+| final_score 계산식 | 결과 집계 설계 | 최종 점수를 계산한다. | ScoreCalculator, EvalResult | 최종 점수 계산 시험 |
+| deduction 계산식 | 알고리즘 상세 설계, 결과 집계 설계 | 감점 항목을 합산한다. | ScoreCalculator, ScoreDetail | 감점 계산 시험 |
+
+이 목록은 수식이 어디에서 정의되고 어디에서 검증되는지 빠르게 찾기 위한 색인이다. 수식 명칭은 본문 설계와 동일하게 유지한다.
+
+### 31.272 데이터 모델 색인
+
+| 항목 | 문서 내 위치 또는 섹션명 | 목적 | 관련 구현 모듈 | 관련 테스트 항목 |
+|---|---|---|---|---|
+| Position | 데이터 모델 관계도, 용어 및 데이터 사전 | 위치 좌표를 표현한다. | MissionConfig, CaptureRecord, ScoreDetail | 위치 파싱 시험 |
+| Direction | 데이터 모델 관계도, 용어 및 데이터 사전 | 방향 각도를 표현한다. | MissionConfig, CaptureRecord, ScoreDetail | 방향 파싱 시험 |
+| TargetPoint | 데이터 모델 관계도, 입력 파일 스키마 상세 설계 | 평가 목표를 표현한다. | MissionConfig, Matcher, Evaluator | target 매칭 시험 |
+| Tolerance | 데이터 모델 관계도, 용어 및 데이터 사전 | 허용 오차를 표현한다. | MissionConfig, TargetPoint | 허용 오차 시험 |
+| Weights | 데이터 모델 관계도, 용어 및 데이터 사전 | 가중치를 표현한다. | MissionConfig, ScoreCalculator | 가중치 계산 시험 |
+| DeductionPolicy | 데이터 모델 관계도, 용어 및 데이터 사전 | 감점 정책을 표현한다. | MissionConfig, ScoreCalculator | 감점 정책 시험 |
+| MissionConfig | 데이터 모델 관계도, 입력 파일 스키마 상세 설계 | 임무 설정을 표현한다. | FileLoader, Validator, Evaluator | mission 설정 시험 |
+| CaptureRecord | 데이터 모델 관계도, 입력 파일 스키마 상세 설계 | 촬영 기록을 표현한다. | FileLoader, Validator, Evaluator | capture 로그 시험 |
+| CollisionRecord | 데이터 모델 관계도, 입력 파일 스키마 상세 설계 | 충돌 기록을 표현한다. | FileLoader, Validator, Evaluator | collision 로그 시험 |
+| TargetResult | 데이터 모델 관계도, 결과 집계 설계 | target별 결과를 표현한다. | Evaluator, ScoreCalculator, ReportExporter | target 결과 시험 |
+| ScoreDetail | 데이터 모델 관계도, 결과 집계 설계 | 상세 점수와 오차를 표현한다. | Evaluator, ScoreCalculator, ReportExporter | 상세 점수 시험 |
+| EvalResult | 데이터 모델 관계도, 결과 집계 설계 | 전체 평가 결과를 표현한다. | Evaluator, ReportExporter, View | 결과 집계 시험 |
+
+이 색인은 데이터 구조와 구현 책임을 함께 확인하기 위한 참조표이다. 모델명은 입력, 계산, 출력 전반에서 동일하게 유지한다.
+
+### 31.273 입력/출력 파일 색인
+
+| 항목 | 문서 내 위치 또는 섹션명 | 목적 | 관련 구현 모듈 | 관련 테스트 항목 |
+|---|---|---|---|---|
+| mission_config.json | 입력 파일 스키마 상세 설계, 파일명 및 리포트 용어 | 임무 설정을 입력한다. | FileLoader, Validator | mission_config 입력 시험 |
+| capture_log.csv | 입력 파일 스키마 상세 설계, 파일명 및 리포트 용어 | 촬영 로그를 입력한다. | FileLoader, Validator | capture_log 입력 시험 |
+| collision_log.csv | 입력 파일 스키마 상세 설계, 파일명 및 리포트 용어 | 충돌 로그를 입력한다. | FileLoader, Validator | collision_log 입력 시험 |
+| eval_result.json | 리포트 저장 상세 설계, 파일명 및 리포트 용어 | 상세 결과를 저장한다. | ReportExporter | eval_result JSON 저장 시험 |
+| eval_summary.json | 리포트 저장 상세 설계, 파일명 및 리포트 용어 | 요약 결과를 저장한다. | ReportExporter | eval_summary JSON 저장 시험 |
+| eval_result.csv | 리포트 저장 상세 설계, 파일명 및 리포트 용어 | 상세 결과를 CSV로 저장한다. | ReportExporter | eval_result CSV 저장 시험 |
+| eval_detail.csv | 리포트 저장 상세 설계, 파일명 및 리포트 용어 | 타깃별 상세 결과를 CSV로 저장한다. | ReportExporter | eval_detail CSV 저장 시험 |
+
+이 색인은 입력과 출력 파일의 이름을 기준으로 관련 설계를 찾기 위한 참조표이다. 파일명은 외부 검토와 저장 시험의 기준이므로 일관성이 중요하다.
+
+### 31.274 서비스 모듈 색인
+
+| 항목 | 문서 내 위치 또는 섹션명 | 목적 | 관련 구현 모듈 | 관련 테스트 항목 |
+|---|---|---|---|---|
+| FileLoader | 입력 파일 스키마 상세 설계, 모듈별 Public Method 명세 | 입력 파일을 읽는다. | FileLoader | 파일 로드 시험 |
+| Validator | 오류 처리 매트릭스, 모듈별 Public Method 명세 | 입력을 검증한다. | Validator | 입력 검증 시험 |
+| Matcher | 알고리즘 상세 설계, 모듈별 Public Method 명세 | target과 capture를 매칭한다. | Matcher | 매칭 시험 |
+| Evaluator | 알고리즘 상세 설계, 평가 실행 Sequence Diagram | 평가를 수행하고 집계한다. | Evaluator | 평가 흐름 시험 |
+| ScoreCalculator | 결과 집계 설계, 알고리즘 상세 설계 | 점수와 감점을 계산한다. | ScoreCalculator | 점수 계산 시험 |
+| ReportExporter | 리포트 저장 상세 설계 | 리포트를 저장한다. | ReportExporter | 리포트 저장 시험 |
+| AppController | 평가 상태 전이도, 운영 절차 및 사용자 작업 흐름 | 흐름을 제어한다. | AppController | 상태 제어 시험 |
+| View | UI 탭별 상세 설계, 운영 절차 및 사용자 작업 흐름 | 화면을 표시한다. | View | UI 표시 시험 |
+
+이 색인은 서비스와 UI가 어떤 책임을 맡는지 빠르게 찾기 위한 참조표이다. 모듈 역할이 바뀌면 관련 설계와 시험 항목도 함께 점검해야 한다.
+
+### 31.275 UI 탭 색인
+
+| 항목 | 문서 내 위치 또는 섹션명 | 목적 | 관련 구현 모듈 | 관련 테스트 항목 |
+|---|---|---|---|---|
+| 파일 선택 | UI 탭별 상세 설계, 운영 절차 및 사용자 작업 흐름 | 입력 파일을 지정한다. | View, AppController | 파일 선택 탭 시험 |
+| 임무 설정 확인 | UI 탭별 상세 설계, 운영 절차 및 사용자 작업 흐름 | mission 설정을 확인한다. | View, AppController | 임무 설정 확인 탭 시험 |
+| 평가 실행 | UI 탭별 상세 설계, 운영 절차 및 사용자 작업 흐름 | 평가를 시작한다. | View, AppController, Evaluator | 평가 실행 탭 시험 |
+| 결과 요약 | UI 탭별 상세 설계, 운영 절차 및 사용자 작업 흐름 | 전체 결과를 확인한다. | View | 결과 요약 탭 시험 |
+| 상세 결과 | UI 탭별 상세 설계, 운영 절차 및 사용자 작업 흐름 | target별 결과를 확인한다. | View | 상세 결과 탭 시험 |
+| 시각화 | UI 탭별 상세 설계, 운영 절차 및 사용자 작업 흐름 | 그래프와 미리보기를 확인한다. | View | 시각화 탭 시험 |
+| 리포트 저장 | UI 탭별 상세 설계, 운영 절차 및 사용자 작업 흐름 | 결과 파일을 저장한다. | View, AppController, ReportExporter | 리포트 저장 탭 시험 |
+
+이 색인은 UI 탭 이름을 기준으로 설계와 운영 절차를 찾는 데 사용한다. 탭명은 사용자 흐름과 시험 항목의 기준이 된다.
+
+### 31.276 테스트 파일 색인
+
+| 항목 | 문서 내 위치 또는 섹션명 | 목적 | 관련 구현 모듈 | 관련 테스트 항목 |
+|---|---|---|---|---|
+| tests/conftest.py | 테스트 설계 및 추적성 매트릭스 | 공통 테스트 설정을 제공한다. | tests | 공통 픽스처 시험 |
+| tests/test_angle_utils.py | 알고리즘 상세 설계, 용어 및 데이터 사전 | 각도 유틸리티를 검증한다. | angle_utils | 각도 유틸 시험 |
+| tests/test_evaluator.py | 알고리즘 상세 설계, 결과 집계 설계 | 평가 흐름을 검증한다. | Evaluator | 평가 시험 |
+| tests/test_file_loader.py | 입력 파일 스키마 상세 설계 | 파일 로드를 검증한다. | FileLoader | 파일 로드 시험 |
+| tests/test_matcher.py | 알고리즘 상세 설계 | 매칭을 검증한다. | Matcher | 매칭 시험 |
+| tests/test_report_exporter.py | 리포트 저장 상세 설계 | 리포트 저장을 검증한다. | ReportExporter | 리포트 저장 시험 |
+| tests/test_score_calculator.py | 결과 집계 설계, 알고리즘 상세 설계 | 점수 계산을 검증한다. | ScoreCalculator | 점수 계산 시험 |
+| tests/test_validator.py | 오류 처리 매트릭스, 입력 파일 스키마 상세 설계 | 입력 검증을 검증한다. | Validator | 검증 시험 |
+
+이 색인은 테스트 파일과 설계 섹션을 연결하기 위한 참조표이다. 파일명은 구현과 시험의 연결 고리이므로 유지보수 시 우선 확인한다.
+
+### 31.277 오류 등급 색인
+
+| 항목 | 문서 내 위치 또는 섹션명 | 목적 | 관련 구현 모듈 | 관련 테스트 항목 |
+|---|---|---|---|---|
+| Fatal | 오류 처리 매트릭스, 문서 검토 기준 및 품질 점검표 | 즉시 중단이 필요한 오류를 표시한다. | Validator, AppController, View | Fatal 오류 시험 |
+| Recoverable | 오류 처리 매트릭스, 운영 절차 및 사용자 작업 흐름 | 일부 복구 후 진행 가능한 오류를 표시한다. | Validator, AppController, View | Recoverable 오류 시험 |
+| Warning | 오류 처리 매트릭스, 운영 절차 및 사용자 작업 흐름 | 주의가 필요한 상태를 표시한다. | View, Validator | Warning 시험 |
+| Info | 오류 처리 매트릭스, UI 탭별 상세 설계 | 안내 수준의 정보를 표시한다. | View, AppController | Info 시험 |
+| Error | 평가 상태 전이도, 오류 처리 매트릭스 | 실패 상태를 표시한다. | AppController, View | Error 상태 시험 |
+
+이 색인은 오류 분류와 상태 전이를 빠르게 찾기 위한 참조표이다. 오류 등급은 사용자 조치와 시험 기대값을 함께 결정한다.
+
+### 31.278 상태 용어 색인
+
+| 항목 | 문서 내 위치 또는 섹션명 | 목적 | 관련 구현 모듈 | 관련 테스트 항목 |
+|---|---|---|---|---|
+| Idle | 평가 상태 전이도, 용어 및 데이터 사전 | 초기 상태를 나타낸다. | AppController, View | 초기 상태 시험 |
+| FilesSelected | 평가 상태 전이도, 운영 절차 및 사용자 작업 흐름 | 입력 파일 선택 완료 상태를 나타낸다. | AppController, View | 파일 선택 상태 시험 |
+| Loading | 평가 상태 전이도 | 입력을 읽는 상태를 나타낸다. | FileLoader, AppController | 로딩 상태 시험 |
+| Validating | 평가 상태 전이도 | 입력 검증 상태를 나타낸다. | Validator, AppController | 검증 상태 시험 |
+| ReadyToEvaluate | 평가 상태 전이도 | 평가 가능 상태를 나타낸다. | AppController, View | 준비 상태 시험 |
+| Evaluating | 평가 상태 전이도 | 평가 실행 중 상태를 나타낸다. | Evaluator, AppController | 실행 상태 시험 |
+| Completed | 평가 상태 전이도, 운영 절차 및 사용자 작업 흐름 | 평가 완료 상태를 나타낸다. | AppController, View | 완료 상태 시험 |
+| Exporting | 평가 상태 전이도 | 저장 중 상태를 나타낸다. | ReportExporter, AppController | 저장 상태 시험 |
+| Error | 평가 상태 전이도, 오류 처리 매트릭스 | 오류 상태를 나타낸다. | AppController, View | 오류 상태 시험 |
+
+이 색인은 상태 이름을 기준으로 상태 전이와 UI 흐름을 찾는 데 사용한다. 상태명은 문서 전체에서 동일해야 한다.
+
+### 31.279 문서 활용 가이드
+
+- 구현자는 모듈별 Public Method 명세와 알고리즘 상세 설계를 우선 확인한다.
+- 테스트 작성자는 테스트 설계 및 추적성 매트릭스와 실행 시나리오 상세 설계를 우선 확인한다.
+- UI 구현자는 UI 탭별 상세 설계와 상태 전이도를 우선 확인한다.
+- 문서 검토자는 문서 검토 기준 및 품질 점검표를 기준으로 확인한다.
+- 변경이 필요한 경우 미확정 사항 및 변경 관리 설계를 먼저 확인한다.
+
+이 가이드는 문서가 방대해졌을 때 어떤 순서로 읽어야 하는지 제안한다. 목적은 빠른 탐색이며, 설계 기준을 새로 만드는 것이 아니다.
+
+### 31.280 최종 문서 완료 선언
+
+- 본 SDD는 AirSim 기반 드론 항공촬영 임무 평가 시스템 구현을 위한 상세 설계 기준이다.
+- 입력, 처리, 출력, UI, 오류 처리, 테스트, 운영 절차, 변경 관리 기준을 포함한다.
+- 구현 착수 전 SRS/STD와의 모순 여부를 최종 확인해야 한다.
+- 미확정 사항은 임의 구현하지 않고 변경 관리 절차에 따라 확정해야 한다.
+
+이 선언은 본 문서가 구현, 검토, 시험, 운영 기준을 모두 담는 최종 상세 설계 문서임을 명시한다. 실제 구현 전에 이 선언과 상위 요구사항 간 모순이 없는지 마지막으로 확인해야 한다.
