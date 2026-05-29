@@ -119,7 +119,36 @@
 - `tests/test_validator.py`
 - `tests/test_report_exporter.py`
 
-각 시험 파일은 본 문서의 4절 시험 항목과 대응되어야 한다.
+시험 ID별 자동화 시험 매핑:
+
+| 시험 ID | 자동화 시험 파일 | 비고 |
+|---|---|---|
+| `TL-01` | `tests/test_file_loader.py` | 임무 설정 JSON 로드 |
+| `TL-02` | `tests/test_file_loader.py` | 촬영 로그 CSV 로드 |
+| `TL-03` | `tests/test_file_loader.py` | 충돌 로그 bool 파싱 |
+| `TL-04` | `tests/test_file_loader.py` | 미지원 확장자 처리 |
+| `TV-01` | `tests/test_validator.py` | 중복 목표 ID 검출 |
+| `TV-02` | `tests/test_validator.py` | 가중치 값 검증 |
+| `TV-03` | `tests/test_validator.py` | 비행 로그 NaN 검출 |
+| `TV-04` | `tests/test_validator.py` | 촬영 로그 NaN 검출 |
+| `TV-05` | `tests/test_validator.py` | 이미지 파일 누락 검출 |
+| `TV-06` | `tests/test_validator.py` | 충돌 로그 NaN 검출 |
+| `TM-01` | `tests/test_angle_utils.py` | 각도 정규화 |
+| `TM-02` | `tests/test_matcher.py` | 비용 함수 비교 |
+| `TM-03` | `tests/test_matcher.py` | 1:1 최적 매칭 |
+| `TM-04` | `tests/test_matcher.py` | 촬영 수 부족 |
+| `TM-05` | `tests/test_matcher.py` | 촬영 수 초과 |
+| `TS-01` | `tests/test_score_calculator.py` | 위치 감점 계산 |
+| `TS-02` | `tests/test_score_calculator.py` | 방향 감점 계산 |
+| `TS-03` | `tests/test_score_calculator.py` | 누락 목표 시간 감점 |
+| `TS-04` | `tests/test_score_calculator.py` | 최종 점수 하한 |
+| `TE-01` | `tests/test_evaluator.py` | 성공/누락/충돌/시간초과 집계 |
+| `TE-02` | `tests/test_evaluator.py` | 평균 오차 계산 범위 |
+| `TE-03` | `tests/test_evaluator.py` | 빈 비행 로그 예외 |
+| `TR-01` | `tests/test_report_exporter.py` | `eval_result.json` 저장 |
+| `TR-02` | `tests/test_report_exporter.py` | `eval_result.csv` 저장 |
+| `TR-03` | `tests/test_report_exporter.py` | `eval_detail.csv` 저장 |
+| `TR-04` | `tests/test_report_exporter.py` | `eval_summary.json` 저장 |
 
 ---
 
