@@ -209,7 +209,8 @@ class VisualizationService:
             Line2D([0], [0], marker="D", color="tomato", label="Timeout",
                    markersize=8, linestyle="None"),
         ]
-        ax.legend(handles=legend_elements, loc="upper right")
+        ax.legend(handles=legend_elements, loc="upper left",
+                  bbox_to_anchor=(1.01, 1), borderaxespad=0)
         ax.set_yticks(y_pos)
         ax.set_yticklabels(ids)
         ax.set_xlabel("Elapsed Time from Mission Start (s)")
@@ -283,13 +284,23 @@ class VisualizationService:
         mission: "Optional[MissionConfig]" = None,
         max_images: int = 50,
     ) -> plt.Figure:
-        valid = [r for r in capture_records if Path(r.image_path).is_file()]
+        valid = [r for r in capture_records if r.image_path and Path(r.image_path).is_file()]
 
         fig, ax = plt.subplots(figsize=(10, 10))
 
         if not valid:
-            ax.text(0.5, 0.5, "No images found", ha="center", va="center", fontsize=14)
+            total = len(capture_records)
+            sample = capture_records[0].image_path if capture_records else "N/A"
+            ax.text(0.5, 0.55, "No images found", ha="center", va="center",
+                    fontsize=14, fontweight="bold")
+            ax.text(0.5, 0.45, f"Total records: {total}", ha="center", va="center",
+                    fontsize=10, color="gray")
+            ax.text(0.5, 0.38, f"Sample path: {sample}", ha="center", va="center",
+                    fontsize=8, color="gray", wrap=True)
+            ax.text(0.5, 0.28, "Set image folder in File Select tab", ha="center",
+                    va="center", fontsize=10, color="steelblue")
             ax.set_title("Coverage Mosaic")
+            ax.axis("off")
             return fig
 
         step = max(1, len(valid) // max_images)
