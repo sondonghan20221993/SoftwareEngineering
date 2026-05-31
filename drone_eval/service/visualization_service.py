@@ -303,23 +303,44 @@ class VisualizationService:
             ax.axis("off")
             return fig
 
+        # cv2 Stitcher로 자동 합성 시도
+        try:
+            import cv2
+            step = max(1, len(valid) // max_images)
+            imgs_cv = []
+            for rec in valid[::step]:
+                img = cv2.imread(rec.image_path)
+                if img is not None:
+                    h, w = img.shape[:2]
+                    img = cv2.resize(img, (w // 4, h // 4))
+                    imgs_cv.append(img)
+
+            if len(imgs_cv) >= 2:
+                stitcher = cv2.Stitcher_create(cv2.Stitcher_SCANS)
+                status, stitched = stitcher.stitch(imgs_cv)
+                if status == cv2.Stitcher_OK:
+                    stitched_rgb = cv2.cvtColor(stitched, cv2.COLOR_BGR2RGB)
+                    ax.imshow(stitched_rgb)
+                    ax.set_title(f"Stitched Mosaic ({len(imgs_cv)} images)")
+                    ax.axis("off")
+                    fig.tight_layout()
+                    return fig
+        except Exception:
+            pass
+
+        # 폴백: 썸네일 핀 맵
+        from matplotlib.offsetbox import OffsetImage, AnnotationBbox
         step = max(1, len(valid) // max_images)
         for rec in valid[::step]:
             try:
                 img = plt.imread(rec.image_path)
-                # 이미지를 64x64로 다운샘플 (메모리/속도)
-                if img.ndim == 3:
-                    h, w = img.shape[:2]
-                    factor = max(1, w // 64)
-                    img = img[::factor, ::factor]
-                altitude = abs(rec.z) if rec.z != 0 else 10.0
-                half = altitude * 0.9
-                ax.imshow(
-                    img,
-                    extent=[rec.x - half, rec.x + half,
-                            rec.y - half, rec.y + half],
-                    aspect="auto", alpha=0.75, zorder=1,
-                )
+                h, w = img.shape[:2]
+                factor = max(1, w // 80)
+                thumb = img[::factor, ::factor]
+                oi = OffsetImage(thumb, zoom=0.3)
+                ab = AnnotationBbox(oi, (rec.x, rec.y), frameon=True,
+                                    pad=0.1, bboxprops=dict(edgecolor="steelblue", linewidth=0.8))
+                ax.add_artist(ab)
             except Exception:
                 continue
 
@@ -331,7 +352,8 @@ class VisualizationService:
                             textcoords="offset points", xytext=(6, 6),
                             fontsize=9, color="red", fontweight="bold")
 
-        ax.set_title(f"Coverage Mosaic ({len(valid)} images)")
+        ax.autoscale()
+        ax.set_title(f"Photo Pin Map ({len(valid)} images)")
         ax.set_xlabel("X (m)")
         ax.set_ylabel("Y (m)")
         ax.set_aspect("equal", adjustable="datalim")
