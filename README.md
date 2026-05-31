@@ -39,11 +39,25 @@ pip install -e ".[test]"
 
 ---
 
-## 실행
+## 실행 방법 (3가지 선택)
 
+### 1. 데스크톱 앱 (PyQt5)
 ```bash
 python -m drone_eval.main
 ```
+
+### 2. 웹앱 (브라우저)
+```bash
+pip install streamlit pandas
+streamlit run drone_eval/webapp.py
+```
+브라우저가 자동으로 열립니다.
+
+### 3. exe 실행 파일 빌드 (Windows)
+```
+build_exe.bat
+```
+빌드 완료 후 `dist\DroneEval.exe`를 더블클릭하면 됩니다.
 
 ---
 
