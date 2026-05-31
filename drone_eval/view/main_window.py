@@ -15,6 +15,7 @@ from drone_eval.view.tab_visual import TabVisual
 from drone_eval.view.tab_report import TabReport
 from drone_eval.view.tab_preview import TabPreview
 from drone_eval.view.tab_history import TabHistory
+from drone_eval.view.tab_odm import TabODM
 
 
 class MainWindow(QMainWindow):
@@ -36,6 +37,7 @@ class MainWindow(QMainWindow):
         self._tab_report = TabReport(controller)
         self._tab_preview = TabPreview(controller)
         self._tab_history = TabHistory(controller)
+        self._tab_odm = TabODM(controller)
 
         self._tabs.addTab(self._tab_file, "1. 파일 선택")
         self._tabs.addTab(self._tab_mission, "2. 임무 설정 확인")
@@ -46,6 +48,7 @@ class MainWindow(QMainWindow):
         self._tabs.addTab(self._tab_report, "7. 리포트 저장")
         self._tabs.addTab(self._tab_preview, "8. 입력 로그 확인")
         self._tabs.addTab(self._tab_history, "9. 평가 이력")
+        self._tabs.addTab(self._tab_odm, "10. ODM 정사영상")
 
         self._status_bar = QStatusBar()
         self.setStatusBar(self._status_bar)
