@@ -1,8 +1,8 @@
 @echo off
-echo [1/3] PyInstaller 설치 확인 중...
+echo [1/3] Installing PyInstaller...
 pip install pyinstaller >nul 2>&1
 
-echo [2/3] exe 빌드 중... (시간이 걸릴 수 있습니다)
+echo [2/3] Building exe...
 pyinstaller ^
     --onefile ^
     --windowed ^
@@ -14,7 +14,7 @@ pyinstaller ^
     --hidden-import "scipy.sparse.csgraph._validation" ^
     drone_eval\main.py
 
-echo [3/3] 완료!
+echo [3/3] Done!
 echo.
-echo 실행 파일 위치: dist\DroneEval.exe
+echo Output: dist\DroneEval.exe
 pause
