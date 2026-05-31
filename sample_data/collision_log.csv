@@ -1,0 +1,4 @@
+timestamp,collision,x,y,z
+10.0,False,0.0,0.0,-10.0
+45.0,True,9.5,0.1,-9.8
+100.0,False,20.0,15.0,-8.0

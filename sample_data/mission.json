@@ -1,0 +1,63 @@
+{
+  "mission_id": "sample_mission_001",
+  "allow_position_error": 2.0,
+  "allow_yaw_error": 15.0,
+  "allow_pitch_error": 15.0,
+  "targets": [
+    {
+      "target_id": "T1",
+      "x": 0.0,
+      "y": 0.0,
+      "z": -10.0,
+      "yaw": 90.0,
+      "pitch": -30.0,
+      "time_limit": 60.0
+    },
+    {
+      "target_id": "T2",
+      "x": 20.0,
+      "y": 0.0,
+      "z": -10.0,
+      "yaw": 0.0,
+      "pitch": -20.0,
+      "time_limit": 90.0
+    },
+    {
+      "target_id": "T3",
+      "x": 20.0,
+      "y": 20.0,
+      "z": -8.0,
+      "yaw": -90.0,
+      "pitch": -25.0,
+      "time_limit": 120.0
+    },
+    {
+      "target_id": "T4",
+      "x": 0.0,
+      "y": 20.0,
+      "z": -8.0,
+      "yaw": 180.0,
+      "pitch": -20.0,
+      "time_limit": 150.0
+    },
+    {
+      "target_id": "T5",
+      "x": 10.0,
+      "y": 10.0,
+      "z": -12.0,
+      "yaw": 45.0,
+      "pitch": -35.0,
+      "time_limit": 200.0
+    }
+  ],
+  "score_policy": {
+    "position_penalty_per_meter": 5.0,
+    "direction_yaw_penalty_per_degree": 1.0,
+    "direction_pitch_penalty_per_degree": 1.0,
+    "missing_capture_penalty": 10.0,
+    "collision_penalty": 20.0,
+    "timeout_penalty": 5.0,
+    "position_weight": 1.0,
+    "direction_weight": 1.0
+  }
+}
