@@ -182,4 +182,33 @@
 - 수동 검증이 필요한 UI 항목은 요구사항과 일치해야 한다.
 - 동일 입력에 대한 반복 실행 결과가 동일해야 한다.
 - ODM 연동 기능은 Docker 환경에서 수동 시험을 통과해야 한다.
+
+---
+
+## 8. 데이터 수집 도구 시험
+
+### 8.1 convert_airsim.py 시험
+
+| 시험 ID | 내용 | 합격 기준 |
+|---|---|---|
+| `TCA-01` | meta JSON이 있는 데이터셋 변환 | flight_log.csv, capture_log.csv, collision_log.csv, mission.json 생성 |
+| `TCA-02` | GPS 데이터 포함 여부 | capture_log.csv에 latitude, longitude, altitude_gps 컬럼 포함 |
+| `TCA-03` | GPS 좌표 정확도 | meta JSON의 geo_point 값과 CSV 값이 일치 |
+| `TCA-04` | 이미지 경로 절대화 | capture_log.csv의 image_path가 실제 파일 경로로 저장 |
+
+### 8.2 grid_operate.py 시험 (AirSim 환경)
+
+| 시험 ID | 내용 | 합격 기준 |
+|---|---|---|
+| `TGO-M01` | 격자 경로 비행 | 설정한 구역을 지그재그 패턴으로 비행 |
+| `TGO-M02` | 수직 촬영 확인 | 카메라 pitch -90° 설정, 생성 이미지가 수직 하향 촬영 |
+| `TGO-M03` | 이미지 수 검증 | width/height/overlap 파라미터 기반 예상 이미지 수와 실제 수 일치 |
+| `TGO-M04` | ODM 호환 확인 | 생성 데이터를 ODM으로 처리 시 정사영상 생성 성공 |
+
+### 8.3 전체 파이프라인 시험
+
+| 시험 ID | 내용 | 합격 기준 |
+|---|---|---|
+| `TPL-M01` | 격자 비행 → 변환 → 평가 | 평가 시스템에서 정상 평가 결과 출력 |
+| `TPL-M02` | 격자 비행 → 변환 → ODM → 오버레이 | 정사영상 위에 목표점/촬영점 정상 표시 |
 - 100MB 이하 입력 조건에서 목표 성능 기준을 만족해야 한다.

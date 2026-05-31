@@ -5078,3 +5078,58 @@ OpenDroneMap(ODM)을 Docker 외부 프로세스로 실행하여 촬영 이미지
 | rasterio | GeoTIFF 로드 및 좌표 추출 | 선택 (없으면 PIL 폴백) |
 | Pillow | PNG 폴백 로드 | 필수 |
 
+
+---
+
+## 33. 데이터 수집 도구 설계
+
+### 33.1 격자 비행 스크립트 (grid_operate.py)
+
+파일 위치: `D:/epic/CitySample/grid_operate.py`
+
+기존 `test_auto_operate.py`와 동일한 AirSim Python API 구조를 사용하며, 비행 패턴과 카메라 각도만 변경한다.
+
+| 항목 | 기존 스크립트 | grid_operate.py |
+|---|---|---|
+| 카메라 pitch | -45° | -90° (수직 하향) |
+| 비행 패턴 | 원형 궤도 | 격자 지그재그 |
+| 주요 목적 | 3D 객체 촬영 평가 | ODM 정사영상 생성 |
+
+**격자 경로 계산:**
+
+```
+footprint_w = 2 × altitude × tan(FOV/2)   # 가로 커버리지
+footprint_h = footprint_w × (H/W)          # 세로 커버리지 (이미지 비율)
+col_spacing = footprint_w × (1 - overlap)  # 열 간격
+row_spacing = footprint_h × (1 - overlap)  # 행 간격
+```
+
+FOV = 90°, 이미지 크기 1920×1080 기준:
+- 고도 20m → footprint 40m × 22.5m
+- overlap 75% → 간격 10m × 5.6m → 약 54장
+
+### 33.2 데이터 변환 도구 (convert_airsim.py) 업데이트
+
+| 변경 항목 | 내용 |
+|---|---|
+| GPS 추출 | meta JSON의 `gps.geo_point.latitude/longitude/altitude` 직접 사용 |
+| capture_log 컬럼 추가 | GPS 데이터 존재 시 `latitude`, `longitude`, `altitude_gps` 컬럼 자동 추가 |
+| ODM geo.txt 호환 | OdmService.prepare_project()에서 capture_log의 실제 GPS 좌표 사용 가능 |
+
+### 33.3 전체 데이터 흐름
+
+```
+AirSim CitySample
+    ↓ grid_operate.py
+raw dataset (rgb/, meta/)
+    ↓ convert_airsim.py
+flight_log.csv
+capture_log.csv (GPS 포함)
+collision_log.csv
+mission.json
+    ↓ 평가 시스템
+평가 결과 (점수, 오차, 감점)
+    ↓ ODM 탭 (Docker)
+orthophoto.tif
+    ↓ load_orthophoto()
+정사영상 + 평가 결과 오버레이
