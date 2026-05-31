@@ -5017,3 +5017,64 @@ UI는 사용자 절차와 상태 전이를 직접 보여주므로, 탭 이름과
 - 미확정 사항이 구현 로직에 섞여 있다.
 
 이 조건 중 하나라도 해당하면 최종 승인을 보류한다. 보류 사유는 구현 문제로 넘기지 않고 문서 정합성 문제로 우선 해결한다.
+
+---
+
+## 32. ODM 정사영상 연동 설계
+
+### 32.1 개요
+
+OpenDroneMap(ODM)을 Docker 외부 프로세스로 실행하여 촬영 이미지로부터 정사영상을 생성하고, 임무 평가 결과를 오버레이하는 선택 기능이다. ODM 소스코드는 본 시스템에 포함하지 않으며 Docker 이미지(`opendronemap/odm`)를 통해 호출한다.
+
+### 32.2 좌표 변환 설계
+
+촬영 로그는 AirSim NED 로컬 좌표(x, y, z)를 사용하며, ODM은 GPS 좌표(위도, 경도, 고도)를 요구한다. 다음 선형 변환으로 가상 GPS 좌표를 생성한다.
+
+| 변환 | 수식 |
+|---|---|
+| NED → 위도 | `lat = REF_LAT + x / 111320` |
+| NED → 경도 | `lon = REF_LON + y / (111320 × cos(REF_LAT))` |
+| NED → 고도 | `alt = max(0, -z)` |
+
+기준점은 `REF_LAT = 37.0`, `REF_LON = 127.0`으로 고정한다. 실제 지리 좌표와는 무관하며 ODM 내부 정합에만 사용된다.
+
+### 32.3 모듈 설계
+
+| 모듈 | 파일 | 역할 |
+|---|---|---|
+| OdmService | `drone_eval/service/odm_service.py` | 프로젝트 준비, Docker 실행, 결과 로드 |
+| TabODM | `drone_eval/view/tab_odm.py` | ODM 연동 UI 탭 |
+
+### 32.4 OdmService 인터페이스
+
+| 메서드 | 입력 | 출력 | 설명 |
+|---|---|---|---|
+| `prepare_project` | capture_records, project_dir | Path | geo.txt 생성 및 이미지 복사 |
+| `docker_command` | project_dir | list[str] | Docker 실행 명령어 반환 |
+| `run_odm` | project_dir, log_callback | bool | ODM 실행 및 로그 스트리밍 |
+| `find_orthophoto` | project_dir | Optional[Path] | 결과 파일 탐색 |
+| `load_orthophoto` | ortho_path, capture_records | (ndarray, x_min, x_max, y_min, y_max) | 정사영상 로드 및 NED 범위 반환 |
+
+### 32.5 실행 흐름
+
+```
+사용자: 출력 폴더 선택 → 준비 버튼
+    → OdmService.prepare_project() → geo.txt + 이미지 복사
+사용자: ODM 실행 버튼
+    → OdmWorker(QThread) → OdmService.run_odm()
+    → Docker subprocess → 로그 실시간 emit
+    → 완료 신호
+사용자: 결과 불러오기 버튼
+    → OdmService.find_orthophoto()
+    → OdmService.load_orthophoto()
+    → matplotlib 오버레이 → QLabel 표시
+```
+
+### 32.6 의존성
+
+| 의존성 | 용도 | 필수 여부 |
+|---|---|---|
+| Docker Desktop | ODM 실행 엔진 | 필수 (ODM 실행 시) |
+| rasterio | GeoTIFF 로드 및 좌표 추출 | 선택 (없으면 PIL 폴백) |
+| Pillow | PNG 폴백 로드 | 필수 |
+
