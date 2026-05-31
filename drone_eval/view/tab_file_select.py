@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QFileDialog, QTextEdit, QGroupBox, QGridLayout
@@ -8,6 +10,13 @@ from PyQt5.QtCore import pyqtSignal
 
 from drone_eval.controller.app_controller import AppController
 from drone_eval.utils.exceptions import FileLoadError
+
+_AUTO_PATTERNS: dict[str, list[str]] = {
+    "mission_path":    ["mission*.json", "*.json"],
+    "flight_path":     ["flight*.csv", "flight*.json", "*flight*.csv", "*flight*.json"],
+    "capture_path":    ["capture*.csv", "capture*.json", "*capture*.csv", "*capture*.json"],
+    "collision_path":  ["collision*.csv", "collision*.json", "*collision*.csv", "*collision*.json"],
+}
 
 
 class TabFileSelect(QWidget):
@@ -20,6 +29,11 @@ class TabFileSelect(QWidget):
 
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
+
+        auto_btn = QPushButton("폴더에서 자동 감지")
+        auto_btn.setFixedHeight(36)
+        auto_btn.clicked.connect(self._auto_detect)
+        layout.addWidget(auto_btn)
 
         group = QGroupBox("입력 파일 선택")
         grid = QGridLayout()
@@ -59,6 +73,43 @@ class TabFileSelect(QWidget):
         error_group.setLayout(error_layout)
         layout.addWidget(error_group)
         layout.addStretch()
+
+    def _auto_detect(self) -> None:
+        folder = QFileDialog.getExistingDirectory(self, "데이터 폴더 선택")
+        if not folder:
+            return
+
+        folder_path = Path(folder)
+        found: dict[str, str] = {}
+        missing: list[str] = []
+
+        for field_name, patterns in _AUTO_PATTERNS.items():
+            match = None
+            for pattern in patterns:
+                candidates = sorted(folder_path.glob(pattern))
+                if candidates:
+                    match = candidates[0]
+                    break
+            if match:
+                found[field_name] = str(match)
+            else:
+                missing.append(field_name)
+
+        for field_name, path in found.items():
+            self._fields[field_name].setText(path)
+            self._controller.set_file(field_name, path)
+
+        if "mission_path" in found:
+            self._try_load_mission(found["mission_path"])
+
+        messages = []
+        if found:
+            messages.append("자동 감지 완료:\n" + "\n".join(f"  {k}: {v}" for k, v in found.items()))
+        if missing:
+            messages.append("찾지 못한 파일:\n" + "\n".join(f"  {k}" for k in missing))
+
+        self._error_box.setPlainText("\n\n".join(messages))
+        self.files_changed.emit()
 
     def _browse(self, field_name: str, is_folder: bool) -> None:
         if is_folder:

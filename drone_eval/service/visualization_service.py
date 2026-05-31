@@ -10,6 +10,7 @@ import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
 import numpy as np
 
+from drone_eval.model.logs import FlightRecord
 from drone_eval.model.result import EvalResult
 
 if TYPE_CHECKING:
@@ -214,6 +215,65 @@ class VisualizationService:
         ax.set_xlabel("Elapsed Time from Mission Start (s)")
         ax.set_title("Capture Time vs Time Limit per Target")
         ax.grid(True, axis="x", alpha=0.3)
+        fig.tight_layout()
+        return fig
+
+    @staticmethod
+    def flight_path_figure(
+        result: EvalResult,
+        mission: "MissionConfig",
+        flight_records: list[FlightRecord],
+    ) -> plt.Figure:
+        target_map = {t.target_id: t for t in mission.targets}
+
+        fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+        for ax, (xlabel, ylabel, xkey, ykey), title in zip(
+            axes,
+            [("X (m)", "Y (m)", "x", "y"), ("X (m)", "Z (m)", "x", "z")],
+            ["Flight Path (Top View X-Y)", "Flight Path (Side View X-Z)"],
+        ):
+            if flight_records:
+                xs = [getattr(r, xkey) for r in flight_records]
+                ys = [getattr(r, ykey) for r in flight_records]
+                ax.plot(xs, ys, color="steelblue", linewidth=1.2, alpha=0.6, label="Flight Path")
+                ax.scatter(xs[0], ys[0], marker="^", s=100, color="green", zorder=6, label="Start")
+                ax.scatter(xs[-1], ys[-1], marker="s", s=100, color="navy", zorder=6, label="End")
+
+            for tr in result.target_results:
+                tgt = target_map.get(tr.target_id)
+                if tgt is None:
+                    continue
+                tx, ty = getattr(tgt, xkey), getattr(tgt, ykey)
+                ax.scatter(tx, ty, marker="x", s=120, c="crimson", zorder=5, linewidths=2)
+                ax.annotate(tr.target_id, (tx, ty), textcoords="offset points",
+                            xytext=(6, 6), fontsize=8, color="crimson")
+
+                if not tr.is_missing and tr.matched_capture is not None:
+                    cap = tr.matched_capture
+                    cx, cy = getattr(cap, xkey), getattr(cap, ykey)
+                    color = "mediumseagreen" if (tr.position_ok and tr.direction_ok and tr.time_ok) else "darkorange"
+                    ax.scatter(cx, cy, marker="o", s=70, c=color, zorder=4)
+                    ax.plot([tx, cx], [ty, cy], color="gray", alpha=0.4, linewidth=1, linestyle="--")
+
+            legend_elements = [
+                Line2D([0], [0], color="steelblue", label="Flight Path", linewidth=1.5),
+                Line2D([0], [0], marker="^", color="green", label="Start", markersize=8, linestyle="None"),
+                Line2D([0], [0], marker="s", color="navy", label="End", markersize=8, linestyle="None"),
+                Line2D([0], [0], marker="x", color="crimson", label="Target", markersize=9,
+                       linestyle="None", markeredgewidth=2),
+                Line2D([0], [0], marker="o", color="mediumseagreen", label="Capture OK",
+                       markersize=8, linestyle="None"),
+                Line2D([0], [0], marker="o", color="darkorange", label="Capture Failed",
+                       markersize=8, linestyle="None"),
+            ]
+            ax.legend(handles=legend_elements, loc="best", fontsize=7)
+            ax.set_title(title)
+            ax.set_xlabel(xlabel)
+            ax.set_ylabel(ylabel)
+            ax.grid(True, alpha=0.3)
+            ax.set_aspect("equal", adjustable="datalim")
+
         fig.tight_layout()
         return fig
 

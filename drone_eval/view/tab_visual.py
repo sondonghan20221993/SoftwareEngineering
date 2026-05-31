@@ -57,7 +57,7 @@ class TabVisual(QWidget):
 
         self._chart_tabs = QTabWidget()
         self._chart_labels: dict[str, _ChartLabel] = {}
-        chart_names = ["위치 오차", "방향 오차", "감점 분포", "임무 요약", "위치 분포", "촬영 타임라인"]
+        chart_names = ["위치 오차", "방향 오차", "감점 분포", "임무 요약", "위치 분포", "촬영 타임라인", "비행 경로"]
         for name in chart_names:
             label = _ChartLabel()
             scroll = QScrollArea()
@@ -98,6 +98,14 @@ class TabVisual(QWidget):
                     self._chart_labels[name].set_figure(fig)
                 except Exception:
                     self._chart_labels[name].setText(f"{name} 차트 생성 실패")
+
+            try:
+                fig = VisualizationService.flight_path_figure(
+                    result, mission, self._controller.flight_records
+                )
+                self._chart_labels["비행 경로"].set_figure(fig)
+            except Exception:
+                self._chart_labels["비행 경로"].setText("비행 경로 차트 생성 실패")
 
         self._save_btn.setEnabled(True)
 

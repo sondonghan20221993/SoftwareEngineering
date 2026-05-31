@@ -38,7 +38,7 @@ class TabDetail(QWidget):
         self._table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self._table.setEditTriggers(QTableWidget.NoEditTriggers)
         self._table.setSelectionBehavior(QTableWidget.SelectRows)
-        self._table.currentRowChanged.connect(self._on_row_changed)
+        self._table.currentCellChanged.connect(lambda row, col, prev_row, prev_col: self._on_row_changed(row))
         table_layout.addWidget(self._table)
         splitter.addWidget(table_widget)
 
