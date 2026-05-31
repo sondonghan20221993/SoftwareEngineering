@@ -71,9 +71,9 @@ class OdmService:
             "--fast-orthophoto",
             "--orthophoto-resolution", "20",
             "--skip-3dmodel",
+            "--gps-accuracy", "0.1",
+            "--ignore-gsd",
             "--matcher-neighbors", "0",
-            "--min-num-features", "4000",
-            "--dem-resolution", "20",
         ]
 
     @staticmethod
