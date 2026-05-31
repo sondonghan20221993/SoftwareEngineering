@@ -1,14 +1,27 @@
 from dataclasses import dataclass
-from typing import Optional
 
-from drone_eval.model.mission import Position, Direction
+
+@dataclass
+class FlightRecord:
+    timestamp: float
+    x: float
+    y: float
+    z: float
+    roll: float
+    pitch: float
+    yaw: float
+    speed: float
 
 
 @dataclass
 class CaptureRecord:
     timestamp: float
-    position: Position
-    direction: Direction
+    x: float
+    y: float
+    z: float
+    roll: float
+    pitch: float
+    yaw: float
     image_path: str
 
 
@@ -16,4 +29,6 @@ class CaptureRecord:
 class CollisionRecord:
     timestamp: float
     collision: bool
-    position: Position
+    x: float
+    y: float
+    z: float

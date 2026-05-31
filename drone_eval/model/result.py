@@ -1,43 +1,50 @@
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import Any, List, Optional
 
 
 @dataclass
 class TargetResult:
     target_id: str
-    matched_capture_timestamp: Optional[float]
-    position_error: Optional[float]
-    yaw_error: Optional[float]
-    pitch_error: Optional[float]
-    position_ok: bool
-    direction_ok: bool
-    time_ok: bool
-    missing: bool
-    success: bool
-    deduction: float
+    matched_capture: Optional[Any] = None
+    matched_capture_timestamp: Optional[float] = None
+    position_error: Optional[float] = None
+    yaw_error: Optional[float] = None
+    pitch_error: Optional[float] = None
+    position_ok: bool = False
+    direction_ok: bool = False
+    time_ok: bool = False
+    image_linked: bool = False
+    is_missing: bool = False
+    is_timeout: bool = False
+    position_deduction: float = 0.0
+    direction_deduction: float = 0.0
+    timeout_deduction: float = 0.0
 
 
 @dataclass
 class ScoreDetail:
-    position_deduction: float
-    yaw_deduction: float
-    pitch_deduction: float
-    timeout_deduction: float
-    missing_deduction: float
-    collision_deduction: float
+    total_position_deduction: float
+    total_direction_deduction: float
+    total_missing_deduction: float
+    total_collision_deduction: float
+    total_timeout_deduction: float
     total_deduction: float
+    base_score: float
 
 
 @dataclass
 class EvalResult:
-    final_score: float
-    total_targets: int
-    success_count: int
-    missing_count: int
-    timeout_count: int
-    collision_count: int
-    average_position_error: Optional[float]
-    average_yaw_error: Optional[float]
-    average_pitch_error: Optional[float]
-    score_detail: ScoreDetail
-    target_results: List[TargetResult]
+    mission_id: str
+    final_score: float = 0.0
+    total_targets: int = 0
+    success_count: int = 0
+    missing_count: int = 0
+    collision_count: int = 0
+    timeout_count: int = 0
+    avg_position_error: Optional[float] = None
+    avg_yaw_error: Optional[float] = None
+    avg_pitch_error: Optional[float] = None
+    score_detail: Optional[ScoreDetail] = None
+    target_results: List[TargetResult] = field(default_factory=list)
+    collision_records: List[Any] = field(default_factory=list)
+    mission_start_time: Optional[float] = None

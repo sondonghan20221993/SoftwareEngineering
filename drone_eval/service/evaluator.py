@@ -75,6 +75,7 @@ class Evaluator:
             avg_pitch_error=Evaluator._average([result.pitch_error for result in matched_results]),
             score_detail=score_detail,
             final_score=final_score,
+            mission_start_time=t_start,
         )
 
     @staticmethod
