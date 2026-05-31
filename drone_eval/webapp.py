@@ -32,6 +32,8 @@ if "mission" not in st.session_state:
     st.session_state.mission = None
 if "validation_errors" not in st.session_state:
     st.session_state.validation_errors = []
+if "capture_records" not in st.session_state:
+    st.session_state.capture_records = []
 
 
 def _save_upload(uploaded_file) -> Path:
@@ -101,6 +103,7 @@ if run_btn:
 
         st.session_state.eval_result = result
         st.session_state.mission = mission
+        st.session_state.capture_records = capture_records
         progress.progress(100, text="완료!")
         st.sidebar.success("평가 완료!")
 
@@ -238,6 +241,16 @@ with tabs[3]:
             st.markdown("**임무 결과 요약**")
             fig = VisualizationService.summary_figure(result)
             st.image(_fig_to_bytes(fig), use_column_width=True)
+
+        st.markdown("**커버리지 모자이크**")
+        if "capture_records" in st.session_state and st.session_state.capture_records:
+            fig = VisualizationService.coverage_mosaic_figure(
+                st.session_state.capture_records,
+                st.session_state.mission,
+            )
+            st.image(_fig_to_bytes(fig), use_column_width=True)
+        else:
+            st.info("이미지 경로가 포함된 촬영 로그가 있어야 모자이크가 생성됩니다.")
 
 # ── 탭 5: 리포트 저장 ─────────────────────────────────────────────
 with tabs[4]:

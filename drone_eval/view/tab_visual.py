@@ -57,7 +57,7 @@ class TabVisual(QWidget):
 
         self._chart_tabs = QTabWidget()
         self._chart_labels: dict[str, _ChartLabel] = {}
-        chart_names = ["위치 오차", "방향 오차", "감점 분포", "임무 요약", "위치 분포", "촬영 타임라인", "비행 경로"]
+        chart_names = ["위치 오차", "방향 오차", "감점 분포", "임무 요약", "위치 분포", "촬영 타임라인", "비행 경로", "커버리지 모자이크"]
         for name in chart_names:
             label = _ChartLabel()
             scroll = QScrollArea()
@@ -106,6 +106,14 @@ class TabVisual(QWidget):
                 self._chart_labels["비행 경로"].set_figure(fig)
             except Exception:
                 self._chart_labels["비행 경로"].setText("비행 경로 차트 생성 실패")
+
+        try:
+            fig = VisualizationService.coverage_mosaic_figure(
+                self._controller.capture_records, mission
+            )
+            self._chart_labels["커버리지 모자이크"].set_figure(fig)
+        except Exception:
+            self._chart_labels["커버리지 모자이크"].setText("모자이크 생성 실패")
 
         self._save_btn.setEnabled(True)
 

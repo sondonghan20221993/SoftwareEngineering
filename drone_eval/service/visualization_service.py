@@ -10,7 +10,7 @@ import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
 import numpy as np
 
-from drone_eval.model.logs import FlightRecord
+from drone_eval.model.logs import CaptureRecord, FlightRecord
 from drone_eval.model.result import EvalResult
 
 if TYPE_CHECKING:
@@ -274,6 +274,57 @@ class VisualizationService:
             ax.grid(True, alpha=0.3)
             ax.set_aspect("equal", adjustable="datalim")
 
+        fig.tight_layout()
+        return fig
+
+    @staticmethod
+    def coverage_mosaic_figure(
+        capture_records: list[CaptureRecord],
+        mission: "Optional[MissionConfig]" = None,
+        max_images: int = 50,
+    ) -> plt.Figure:
+        valid = [r for r in capture_records if Path(r.image_path).is_file()]
+
+        fig, ax = plt.subplots(figsize=(10, 10))
+
+        if not valid:
+            ax.text(0.5, 0.5, "No images found", ha="center", va="center", fontsize=14)
+            ax.set_title("Coverage Mosaic")
+            return fig
+
+        step = max(1, len(valid) // max_images)
+        for rec in valid[::step]:
+            try:
+                img = plt.imread(rec.image_path)
+                # 이미지를 64x64로 다운샘플 (메모리/속도)
+                if img.ndim == 3:
+                    h, w = img.shape[:2]
+                    factor = max(1, w // 64)
+                    img = img[::factor, ::factor]
+                altitude = abs(rec.z) if rec.z != 0 else 10.0
+                half = altitude * 0.9
+                ax.imshow(
+                    img,
+                    extent=[rec.x - half, rec.x + half,
+                            rec.y - half, rec.y + half],
+                    aspect="auto", alpha=0.75, zorder=1,
+                )
+            except Exception:
+                continue
+
+        if mission is not None:
+            for tgt in mission.targets:
+                ax.scatter(tgt.x, tgt.y, marker="x", s=150, c="red",
+                           linewidths=2.5, zorder=5)
+                ax.annotate(tgt.target_id, (tgt.x, tgt.y),
+                            textcoords="offset points", xytext=(6, 6),
+                            fontsize=9, color="red", fontweight="bold")
+
+        ax.set_title(f"Coverage Mosaic ({len(valid)} images)")
+        ax.set_xlabel("X (m)")
+        ax.set_ylabel("Y (m)")
+        ax.set_aspect("equal", adjustable="datalim")
+        ax.grid(True, alpha=0.2)
         fig.tight_layout()
         return fig
 
