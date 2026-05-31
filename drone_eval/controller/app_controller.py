@@ -20,6 +20,15 @@ _log = get_logger(__name__)
 ProgressCallback = Callable[[str, str, int], None]
 
 
+def _resolve_image_path(rec: CaptureRecord, base: Path) -> CaptureRecord:
+    p = Path(rec.image_path)
+    if not p.is_absolute():
+        resolved = str(base / p)
+        return CaptureRecord(rec.timestamp, rec.x, rec.y, rec.z,
+                             rec.roll, rec.pitch, rec.yaw, resolved)
+    return rec
+
+
 @dataclass
 class FileState:
     mission_path: str = ""
@@ -135,6 +144,12 @@ class AppController:
             capture_records = FileLoader.load_capture_records(self._file_state.capture_path)
         except Exception as exc:
             raise FileLoadError(self._file_state.capture_path, str(exc)) from exc
+
+        if self._file_state.image_folder:
+            image_base = Path(self._file_state.image_folder)
+            capture_records = [
+                _resolve_image_path(rec, image_base) for rec in capture_records
+            ]
 
         _progress("파일 로드", "충돌 로그 로드 중...", 60)
         try:
