@@ -87,14 +87,20 @@ def convert(dataset_dir: Path, output_dir: Path) -> None:
         cam_pos = cam["position"]
         cam_ori = cam["orientation"]
         image_path = data["image"]["rgb_path"].replace("\\", "/")
-        # 절대 경로로 변환
         abs_image_path = str((dataset_dir / image_path).resolve())
 
         cam_roll, cam_pitch, cam_yaw = quaternion_to_euler_deg(
             cam_ori["w"], cam_ori["x"], cam_ori["y"], cam_ori["z"]
         )
 
-        capture_rows.append({
+        # 실제 GPS 좌표 (meta JSON에서 직접 사용)
+        gps = data.get("gps", {})
+        geo = gps.get("geo_point", {})
+        lat = geo.get("latitude", None)
+        lon = geo.get("longitude", None)
+        alt = geo.get("altitude", None)
+
+        row = {
             "timestamp": round(timestamp, 6),
             "x": cam_pos["x"],
             "y": cam_pos["y"],
@@ -103,7 +109,12 @@ def convert(dataset_dir: Path, output_dir: Path) -> None:
             "pitch": round(cam_pitch, 4),
             "yaw": round(cam_yaw, 4),
             "image_path": abs_image_path,
-        })
+        }
+        if lat is not None:
+            row["latitude"] = round(lat, 8)
+            row["longitude"] = round(lon, 8)
+            row["altitude_gps"] = round(alt, 3)
+        capture_rows.append(row)
 
     # ── 비행 로그 저장 ─────────────────────────────────────────────────
     flight_path = output_dir / "flight_log.csv"
@@ -114,12 +125,18 @@ def convert(dataset_dir: Path, output_dir: Path) -> None:
     print(f"비행 로그 저장: {flight_path}  ({len(flight_rows)}행)")
 
     # ── 촬영 로그 저장 ─────────────────────────────────────────────────
+    has_gps = any("latitude" in r for r in capture_rows)
+    capture_fields = ["timestamp", "x", "y", "z", "roll", "pitch", "yaw", "image_path"]
+    if has_gps:
+        capture_fields += ["latitude", "longitude", "altitude_gps"]
+
     capture_path = output_dir / "capture_log.csv"
     with capture_path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["timestamp", "x", "y", "z", "roll", "pitch", "yaw", "image_path"])
+        writer = csv.DictWriter(f, fieldnames=capture_fields, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(capture_rows)
-    print(f"촬영 로그 저장: {capture_path}  ({len(capture_rows)}행)")
+    gps_note = " (실제 GPS 포함)" if has_gps else ""
+    print(f"촬영 로그 저장: {capture_path}  ({len(capture_rows)}행){gps_note}")
 
     # ── 충돌 로그 (빈 파일) ────────────────────────────────────────────
     collision_path = output_dir / "collision_log.csv"
