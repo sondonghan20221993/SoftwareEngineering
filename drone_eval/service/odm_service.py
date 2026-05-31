@@ -69,8 +69,11 @@ class OdmService:
             "opendronemap/odm",
             "--project-path", "/datasets", "project",
             "--fast-orthophoto",
-            "--orthophoto-resolution", "5",
+            "--orthophoto-resolution", "20",
             "--skip-3dmodel",
+            "--matcher-neighbors", "0",
+            "--min-num-features", "4000",
+            "--dem-resolution", "20",
         ]
 
     @staticmethod
