@@ -74,16 +74,31 @@ class TabODM(QWidget):
         out_row.addWidget(out_browse)
         config_layout.addLayout(out_row)
 
+        # 외부 이미지 폴더 (GPS EXIF 내장)
+        ext_row = QHBoxLayout()
+        ext_row.addWidget(QLabel("외부 이미지 폴더\n(GPS EXIF):"))
+        self._ext_dir_edit = QLineEdit()
+        self._ext_dir_edit.setReadOnly(True)
+        self._ext_dir_edit.setPlaceholderText("GPS EXIF가 있는 이미지 폴더 (선택 사항)...")
+        ext_row.addWidget(self._ext_dir_edit)
+        ext_browse = QPushButton("찾아보기")
+        ext_browse.clicked.connect(self._browse_ext_dir)
+        ext_row.addWidget(ext_browse)
+        config_layout.addLayout(ext_row)
+
         # 버튼 행
         btn_row = QHBoxLayout()
         self._prepare_btn = QPushButton("준비 (geo.txt 생성)")
         self._prepare_btn.clicked.connect(self._prepare)
+        self._prepare_ext_btn = QPushButton("준비 (외부 이미지)")
+        self._prepare_ext_btn.clicked.connect(self._prepare_from_folder)
         self._run_btn = QPushButton("▶ ODM 실행 (Docker)")
         self._run_btn.setEnabled(False)
         self._run_btn.clicked.connect(self._run_odm)
         self._load_btn = QPushButton("결과 불러오기")
         self._load_btn.clicked.connect(self._load_result)
         btn_row.addWidget(self._prepare_btn)
+        btn_row.addWidget(self._prepare_ext_btn)
         btn_row.addWidget(self._run_btn)
         btn_row.addWidget(self._load_btn)
         btn_row.addStretch()
@@ -129,11 +144,35 @@ class TabODM(QWidget):
         if path:
             self._out_dir_edit.setText(path)
 
+    def _browse_ext_dir(self) -> None:
+        path = QFileDialog.getExistingDirectory(self, "외부 이미지 폴더 선택")
+        if path:
+            self._ext_dir_edit.setText(path)
+
     def _log(self, msg: str) -> None:
         self._log_edit.append(msg)
         self._log_edit.verticalScrollBar().setValue(
             self._log_edit.verticalScrollBar().maximum()
         )
+
+    def _prepare_from_folder(self) -> None:
+        ext_dir = self._ext_dir_edit.text().strip()
+        out_dir = self._out_dir_edit.text().strip()
+        if not ext_dir:
+            self._log("외부 이미지 폴더를 먼저 선택하세요.")
+            return
+        if not out_dir:
+            self._log("출력 폴더를 먼저 선택하세요.")
+            return
+        try:
+            project = OdmService.prepare_project_from_folder(ext_dir, out_dir)
+            self._project_dir = str(project)
+            count = len(list((project / "images").iterdir()))
+            self._log(f"준비 완료: {project}")
+            self._log(f"이미지 {count}장 복사 (GPS EXIF 모드)")
+            self._run_btn.setEnabled(True)
+        except Exception as exc:
+            self._log(f"준비 실패: {exc}")
 
     def _prepare(self) -> None:
         out_dir = self._out_dir_edit.text().strip()

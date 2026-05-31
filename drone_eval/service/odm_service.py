@@ -32,6 +32,26 @@ def latlon_to_ned(lat: float, lon: float) -> tuple[float, float]:
 
 class OdmService:
     @staticmethod
+    def prepare_project_from_folder(
+        image_dir: str | Path,
+        project_dir: str | Path,
+    ) -> Path:
+        """GPS EXIF가 이미 있는 이미지 폴더를 ODM 프로젝트로 준비."""
+        project = Path(project_dir)
+        images_dir = project / "images"
+        images_dir.mkdir(parents=True, exist_ok=True)
+
+        exts = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
+        count = 0
+        for src in Path(image_dir).iterdir():
+            if src.suffix.lower() in exts:
+                dst = images_dir / src.name
+                if not dst.exists():
+                    shutil.copy2(src, dst)
+                count += 1
+        return project
+
+    @staticmethod
     def prepare_project(
         capture_records: list[CaptureRecord],
         project_dir: str | Path,
