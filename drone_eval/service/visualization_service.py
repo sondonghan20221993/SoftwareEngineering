@@ -308,7 +308,7 @@ class VisualizationService:
         from PIL import Image as PILImage
 
         ppm = pixels_per_meter
-        half_fov = math.radians(90.0 / 2)  # AirSim 기본 FOV 90°
+        half_fov = math.radians(90.0 / 2)
 
         padding = max((abs(r.z) if r.z != 0 else 10.0) * 2 for r in valid)
         x_min = min(r.x for r in valid) - padding
@@ -316,11 +316,13 @@ class VisualizationService:
         y_min = min(r.y for r in valid) - padding
         y_max = max(r.y for r in valid) + padding
 
-        canvas_w = max(1, int((x_max - x_min) * ppm))
-        canvas_h = max(1, int((y_max - y_min) * ppm))
-        canvas = PILImage.new("RGB", (canvas_w, canvas_h), (30, 30, 30))
+        W = max(1, int((x_max - x_min) * ppm))
+        H = max(1, int((y_max - y_min) * ppm))
 
-        for rec in sorted(valid, key=lambda r: r.timestamp):
+        color_acc = np.zeros((H, W, 3), dtype=np.float32)
+        weight_acc = np.zeros((H, W), dtype=np.float32)
+
+        for rec in valid:
             try:
                 img = PILImage.open(rec.image_path).convert("RGB")
                 altitude = abs(rec.z) if abs(rec.z) > 0.1 else 10.0
@@ -331,18 +333,42 @@ class VisualizationService:
 
                 thumb = img.resize((pw, ph), PILImage.LANCZOS)
                 rotated = thumb.rotate(-rec.yaw, expand=True, resample=PILImage.BICUBIC)
+                rw, rh = rotated.size
+
+                # 중심 가중치 마스크 (중심=1, 가장자리=0)
+                ys_w, xs_w = np.mgrid[0:rh, 0:rw]
+                dist = np.sqrt(((xs_w - rw / 2) / (rw / 2)) ** 2 +
+                               ((ys_w - rh / 2) / (rh / 2)) ** 2)
+                weight = np.clip(1.0 - dist, 0, 1).astype(np.float32)
 
                 cx = int((rec.x - x_min) * ppm)
                 cy = int((y_max - rec.y) * ppm)
-                px = cx - rotated.width // 2
-                py = cy - rotated.height // 2
+                px = cx - rw // 2
+                py = cy - rh // 2
 
-                if px + rotated.width > 0 and py + rotated.height > 0 and px < canvas_w and py < canvas_h:
-                    canvas.paste(rotated, (px, py))
+                x0, x1 = max(0, px), min(W, px + rw)
+                y0, y1 = max(0, py), min(H, py + rh)
+                ix0, ix1 = x0 - px, x1 - px
+                iy0, iy1 = y0 - py, y1 - py
+
+                if x1 <= x0 or y1 <= y0:
+                    continue
+
+                img_arr = np.array(rotated, dtype=np.float32)[iy0:iy1, ix0:ix1]
+                w_sl = weight[iy0:iy1, ix0:ix1]
+
+                color_acc[y0:y1, x0:x1] += img_arr * w_sl[:, :, np.newaxis]
+                weight_acc[y0:y1, x0:x1] += w_sl
             except Exception:
                 continue
 
-        ax.imshow(np.array(canvas), extent=[x_min, x_max, y_min, y_max],
+        mask = weight_acc > 0
+        result = np.full((H, W, 3), 30, dtype=np.uint8)
+        result[mask] = np.clip(
+            color_acc[mask] / weight_acc[mask, np.newaxis], 0, 255
+        ).astype(np.uint8)
+
+        ax.imshow(result, extent=[x_min, x_max, y_min, y_max],
                   origin="upper", aspect="equal")
 
         if mission is not None:
@@ -353,7 +379,7 @@ class VisualizationService:
                             textcoords="offset points", xytext=(6, 6),
                             fontsize=9, color="red", fontweight="bold")
 
-        ax.set_title(f"Orthomosaic ({len(valid)} images)")
+        ax.set_title(f"Orthomosaic — weighted blend ({len(valid)} images)")
         ax.set_xlabel("X (m)")
         ax.set_ylabel("Y (m)")
         ax.grid(True, alpha=0.15, color="white")
