@@ -283,6 +283,7 @@ class VisualizationService:
         capture_records: list[CaptureRecord],
         mission: "Optional[MissionConfig]" = None,
         max_images: int = 50,
+        pixels_per_meter: float = 15.0,
     ) -> plt.Figure:
         valid = [r for r in capture_records if r.image_path and Path(r.image_path).is_file()]
 
@@ -303,46 +304,46 @@ class VisualizationService:
             ax.axis("off")
             return fig
 
-        # cv2 Stitcher로 자동 합성 시도
-        try:
-            import cv2
-            step = max(1, len(valid) // max_images)
-            imgs_cv = []
-            for rec in valid[::step]:
-                img = cv2.imread(rec.image_path)
-                if img is not None:
-                    h, w = img.shape[:2]
-                    img = cv2.resize(img, (w // 4, h // 4))
-                    imgs_cv.append(img)
+        import math
+        from PIL import Image as PILImage
 
-            if len(imgs_cv) >= 2:
-                stitcher = cv2.Stitcher_create(cv2.Stitcher_SCANS)
-                status, stitched = stitcher.stitch(imgs_cv)
-                if status == cv2.Stitcher_OK:
-                    stitched_rgb = cv2.cvtColor(stitched, cv2.COLOR_BGR2RGB)
-                    ax.imshow(stitched_rgb)
-                    ax.set_title(f"Stitched Mosaic ({len(imgs_cv)} images)")
-                    ax.axis("off")
-                    fig.tight_layout()
-                    return fig
-        except Exception:
-            pass
+        ppm = pixels_per_meter
+        half_fov = math.radians(90.0 / 2)  # AirSim 기본 FOV 90°
 
-        # 폴백: 썸네일 핀 맵
-        from matplotlib.offsetbox import OffsetImage, AnnotationBbox
-        step = max(1, len(valid) // max_images)
-        for rec in valid[::step]:
+        padding = max((abs(r.z) if r.z != 0 else 10.0) * 2 for r in valid)
+        x_min = min(r.x for r in valid) - padding
+        x_max = max(r.x for r in valid) + padding
+        y_min = min(r.y for r in valid) - padding
+        y_max = max(r.y for r in valid) + padding
+
+        canvas_w = max(1, int((x_max - x_min) * ppm))
+        canvas_h = max(1, int((y_max - y_min) * ppm))
+        canvas = PILImage.new("RGB", (canvas_w, canvas_h), (30, 30, 30))
+
+        for rec in sorted(valid, key=lambda r: r.timestamp):
             try:
-                img = plt.imread(rec.image_path)
-                h, w = img.shape[:2]
-                factor = max(1, w // 80)
-                thumb = img[::factor, ::factor]
-                oi = OffsetImage(thumb, zoom=0.3)
-                ab = AnnotationBbox(oi, (rec.x, rec.y), frameon=True,
-                                    pad=0.1, bboxprops=dict(edgecolor="steelblue", linewidth=0.8))
-                ax.add_artist(ab)
+                img = PILImage.open(rec.image_path).convert("RGB")
+                altitude = abs(rec.z) if abs(rec.z) > 0.1 else 10.0
+                fw = 2 * altitude * math.tan(half_fov)
+                fh = fw * img.height / img.width
+                pw = max(1, int(fw * ppm))
+                ph = max(1, int(fh * ppm))
+
+                thumb = img.resize((pw, ph), PILImage.LANCZOS)
+                rotated = thumb.rotate(-rec.yaw, expand=True, resample=PILImage.BICUBIC)
+
+                cx = int((rec.x - x_min) * ppm)
+                cy = int((y_max - rec.y) * ppm)
+                px = cx - rotated.width // 2
+                py = cy - rotated.height // 2
+
+                if px + rotated.width > 0 and py + rotated.height > 0 and px < canvas_w and py < canvas_h:
+                    canvas.paste(rotated, (px, py))
             except Exception:
                 continue
+
+        ax.imshow(np.array(canvas), extent=[x_min, x_max, y_min, y_max],
+                  origin="upper", aspect="equal")
 
         if mission is not None:
             for tgt in mission.targets:
@@ -352,12 +353,10 @@ class VisualizationService:
                             textcoords="offset points", xytext=(6, 6),
                             fontsize=9, color="red", fontweight="bold")
 
-        ax.autoscale()
-        ax.set_title(f"Photo Pin Map ({len(valid)} images)")
+        ax.set_title(f"Orthomosaic ({len(valid)} images)")
         ax.set_xlabel("X (m)")
         ax.set_ylabel("Y (m)")
-        ax.set_aspect("equal", adjustable="datalim")
-        ax.grid(True, alpha=0.2)
+        ax.grid(True, alpha=0.15, color="white")
         fig.tight_layout()
         return fig
 
